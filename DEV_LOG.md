@@ -1,9 +1,9 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 2026-04-03T18:55:00Z
+Последнее обновление: 2026-04-03T19:05:00Z
 
 ## Сессия: Phase 1, Task #1 — Scaffold + ETL Pipeline
-**Дата:** 2026-04-03  
-**Участники:** Orchestrator, Engineer  
+**Дата:** 2026-04-03
+**Участники:** Orchestrator, Engineer
 **Статус:** ✅ ЗАВЕРШЕНО
 
 ### Контекст
@@ -21,6 +21,7 @@
 7. **Doppler integration** — переменные окружения инжектятся через environment
 8. **Makefile** — команды make dev-api, make up, make logs
 9. **Конфигурация** — accounts.yml для маппинга аккаунтов на валюты
+10. **Git инициализация** — репозиторий создан, все файлы закоммичены
 
 ### Технические детали
 - **Unique constraint:** `(date, amount, account, description)` для предотвращения дублей

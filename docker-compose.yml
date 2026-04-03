@@ -1,0 +1,35 @@
+services:
+  cfo_api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - CFO_DB_URL=${CFO_DB_URL:-sqlite:///./data/cfo.db}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data
+      - ./accounts.yml:/app/accounts.yml:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  cfo_bot:
+    build: .
+    command: python -m bot.main
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - CFO_DB_URL=${CFO_DB_URL:-sqlite:///./data/cfo.db}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      cfo_api:
+        condition: service_healthy
+    volumes:
+      - ./accounts.yml:/app/accounts.yml:ro
+    restart: unless-stopped

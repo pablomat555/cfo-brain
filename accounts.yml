@@ -1,0 +1,8 @@
+# Human-editable mapping of account names to currencies
+# New accounts must be added here manually
+accounts:
+  Payoneer: USD
+  IBKR: USD
+  "Моно 8235": UAH
+  Наличные: UAH
+  # Add new accounts as needed

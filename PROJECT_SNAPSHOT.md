@@ -50,7 +50,8 @@
 
 ## 5. Фокус сессии
 - **Цель:** Завершение Phase 1, Task #1 и подготовка к Task #2
-- **Last Commit:** — (предстоит сделать commit)
+- **Last Commit:** 0555f01 — "feat: Phase 1 Task #1 — scaffold + ETL pipeline" (2026-04-03)
+- **Git Status:** Репозиторий инициализирован, все файлы закоммичены
 
 ### Definition of Done (Phase 1, Task #1)
 - [x] Структура repo создана (все 14+ файлов)
@@ -59,5 +60,6 @@
 - [x] Бот обрабатывает CSV файлы и отправляет их в API
 - [x] make up работает с Docker Compose (оба сервиса healthy)
 - [x] Doppler переменные инжектятся корректно (без env_file)
+- [x] Git репозиторий инициализирован и закоммичен
 
 **COMMAND:** Готов к Task #2 — AI вердикт + /report эндпоинт.

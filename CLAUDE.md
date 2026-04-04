@@ -10,6 +10,16 @@
 - Улучшения вне scope → только в Report секции "Observations outside scope", не в коде
 - Никогда не пиши в Vault напрямую — только через MCP или save API
 
+## Файлы проекта (repo) vs Vault
+
+Следующие файлы живут в repo — читать и писать свободно:
+- DECISION_LOG.md
+- PROJECT_SNAPSHOT.md
+- TASK.md
+- DEV_LOG.md
+
+Vault (Obsidian) — только через MCP → /save.
+Это разные вещи. Не путать.
 ## Проект
 - Название: CFO Brain
 - Repo: git@github.com:pablomat555/cfo-brain.git (создать)

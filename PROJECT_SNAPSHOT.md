@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 2026-04-03T18:52:30Z
+Последнее обновление: 2026-04-04T18:24:45Z
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -16,6 +16,7 @@
   - `core/` — модели данных, конфигурация, работа с БД
   - `etl/` — парсинг CSV, загрузка транзакций, обработка non-breaking spaces
   - `data/` — SQLite база данных (cfo.db)
+  - `analytics/` — агрегация данных и генерация отчётов
 
 ## 3. Окружение
 - **Локально:** ~/Dev/cfo-brain
@@ -29,8 +30,8 @@
   - `LOG_LEVEL` (по умолчанию INFO)
 
 ## 4. Текущее состояние
-- **Версия:** v0.1-alpha
-- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН
+- **Версия:** v0.2-alpha
+- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН
 
 ### Что работает
 - ✅ Полная структура repo создана (14+ файлов)
@@ -42,14 +43,17 @@
 - ✅ Makefile: команды make dev-api, make up, make logs
 - ✅ Уникальный constraint: (date, amount, account, description)
 - ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты
+- ✅ AI-анализ транзакций через OpenRouter (core/ai_verdict.py)
+- ✅ Эндпоинт /report/period для генерации отчётов (api/routers/report.py)
+- ✅ Модель PeriodReport с полем period_type (core/models.py)
+- ✅ Агрегация транзакций (analytics/aggregator.py)
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
-- ⚠️ Нет AI-анализа транзакций (запланировано в Task #2)
-- ⚠️ Нет эндпоинта /report для генерации отчётов (запланировано в Task #2)
+- ⚠️ STRATEGY.md содержит placeholder'ы вместо реальных значений (требуется заполнение)
 
 ## 5. Фокус сессии
-- **Цель:** Завершение Phase 1, Task #1 и подготовка к Task #2
+- **Цель:** Заполнение STRATEGY.md реальными данными (замена placeholder'ов на конкретные значения)
 - **Last Commit:** 0555f01 — "feat: Phase 1 Task #1 — scaffold + ETL pipeline" (2026-04-03)
 - **Git Status:** Репозиторий инициализирован, все файлы закоммичены
 
@@ -62,4 +66,4 @@
 - [x] Doppler переменные инжектятся корректно (без env_file)
 - [x] Git репозиторий инициализирован и закоммичен
 
-**COMMAND:** Готов к Task #2 — AI вердикт + /report эндпоинт.
+**COMMAND:** Заполнить STRATEGY.md реальными данными для использования в AI-анализе и отчётах.

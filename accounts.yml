@@ -6,3 +6,10 @@ accounts:
   "Моно 8235": UAH
   Наличные: UAH
   # Add new accounts as needed
+
+# Parser type for each account (debit_credit, etc.)
+parser_types:
+  Payoneer: debit_credit
+  IBKR: debit_credit
+  "Моно 8235": debit_credit
+  Наличные: debit_credit

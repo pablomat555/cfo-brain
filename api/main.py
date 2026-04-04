@@ -2,12 +2,13 @@ from fastapi import FastAPI
 from loguru import logger
 
 from core.database import init_db
-from api.routers import ingest
+from api.routers import ingest, report
 
 app = FastAPI(title="CFO Brain API", version="0.1.0")
 
 # Включаем роутеры
 app.include_router(ingest.router)
+app.include_router(report.router)
 
 
 @app.on_event("startup")

@@ -36,6 +36,20 @@ def load_accounts_mapping() -> dict[str, str]:
         return {}
 
 
+def load_parser_types() -> dict[str, str]:
+    """Загружает маппинг аккаунтов на тип парсера из accounts.yml"""
+    try:
+        with open("accounts.yml", "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data.get("parser_types", {})
+    except FileNotFoundError:
+        logger.warning("accounts.yml not found, using empty parser mapping")
+        return {}
+    except yaml.YAMLError as e:
+        logger.error(f"Failed to parse accounts.yml: {e}")
+        return {}
+
+
 def parse_csv(file_bytes: bytes, filename: str) -> List[TransactionRaw]:
     """
     Парсит CSV файл в список TransactionRaw.
@@ -44,6 +58,8 @@ def parse_csv(file_bytes: bytes, filename: str) -> List[TransactionRaw]:
     Date, Description, Category, Payee, Tag, Account, Transfer Account, Amount
     """
     accounts_mapping = load_accounts_mapping()
+    parser_types = load_parser_types()
+    logger.debug(f"Loaded parser types: {parser_types}")
     results = []
     
     # Пробуем разные кодировки

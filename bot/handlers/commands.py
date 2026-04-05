@@ -2,6 +2,7 @@ import httpx
 from aiogram import types, Router
 from aiogram.filters import Command
 from loguru import logger
+from datetime import datetime, timedelta
 
 router = Router()
 
@@ -18,8 +19,9 @@ async def cmd_start(message: types.Message):
         "📁 **Формат CSV:** Должен содержать колонки:\n"
         "Date, Description, Category, Payee, Tag, Account, Transfer Account, Amount\n\n"
         "⚡ **Доступные команды:**\n"
-        "/start - это сообщение\n"
-        "/status - статус системы\n\n"
+        "/start — это сообщение\n"
+        "/status — статус системы\n"
+        "/report — финансовый отчёт за текущий месяц\n\n"
         "Отправь мне CSV файл чтобы начать!"
     )
     await message.reply(welcome_text, parse_mode="Markdown")
@@ -50,3 +52,50 @@ async def cmd_status(message: types.Message):
         status_text = f"❌ **Ошибка:** {str(e)}"
     
     await message.reply(status_text, parse_mode="Markdown")
+
+
+@router.message(Command("report"))
+async def cmd_report(message: types.Message):
+    """Обработчик команды /report"""
+    try:
+        # Вычисляем даты текущего месяца
+        today = datetime.now().date()
+        first_day = today.replace(day=1)
+        # Последний день месяца: первый день следующего месяца минус один день
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        last_day = next_month - timedelta(days=1)
+        
+        from_date = first_day.strftime("%Y-%m-%d")
+        to_date = last_day.strftime("%Y-%m-%d")
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"http://cfo_api:8002/report/period?from={from_date}&to={to_date}"
+            )
+            
+            if response.status_code == 200:
+                report = response.json()
+                total_income = report.get("total_income", 0)
+                total_expenses = report.get("total_expenses", 0)
+                net_savings = report.get("net_savings", 0)
+                
+                reply_text = (
+                    f"📊 Отчёт за {first_day.strftime('%B %Y')}\n\n"
+                    f"💰 Доходы: {total_income:.2f}\n"
+                    f"💸 Расходы: {total_expenses:.2f}\n"
+                    f"💵 Чистые сбережения: {net_savings:.2f}\n\n"
+                    f"🤖 AI вердикт:\n(недоступно)"
+                )
+            else:
+                reply_text = "❌ **Не удалось получить отчёт**\nПроверьте, запущен ли сервис."
+                
+    except httpx.ConnectError:
+        reply_text = "❌ **Не могу подключиться к API**\nСервис может быть не запущен."
+    except Exception as e:
+        logger.error(f"Error fetching report: {e}")
+        reply_text = f"❌ **Ошибка:** {str(e)}"
+    
+    await message.reply(reply_text, parse_mode="Markdown")

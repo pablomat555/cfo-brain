@@ -24,7 +24,7 @@ async def handle_csv_upload(message: types.Message, bot: Bot, state: FSMContext)
         async with httpx.AsyncClient(timeout=30.0) as client:
             files = {"file": (document.file_name, file_bytes, "text/csv")}
             response = await client.post(
-                "http://cfo_api:8001/ingest/csv",
+                "http://cfo_api:8002/ingest/csv",
                 files=files
             )
             

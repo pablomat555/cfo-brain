@@ -30,7 +30,7 @@ async def cmd_status(message: types.Message):
     """Обработчик команды /status"""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("http://cfo_api:8001/health")
+            response = await client.get("http://cfo_api:8002/health")
             
             if response.status_code == 200:
                 status_data = response.json()

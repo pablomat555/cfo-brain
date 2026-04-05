@@ -21,3 +21,6 @@ data/
 *.swp
 *.swo
 *~
+venv311/
+venv/
+.venv/

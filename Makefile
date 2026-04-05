@@ -11,7 +11,7 @@ build:
 	docker compose build
 
 dev-api:
-	uvicorn api.main:app --reload --port 8001
+	uvicorn api.main:app --reload --port 8002
 
 dev-bot:
 	python -m bot.main

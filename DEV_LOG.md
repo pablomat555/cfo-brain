@@ -1,5 +1,67 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 2026-04-04T19:32:46Z
+Последнее обновление: 2026-04-05T20:09:10Z
+
+## Сессия: Phase 1, Task #3 и #4 — Изменение порта API и добавление команды /report
+**Дата:** 2026-04-05
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- Цель 1: Изменить порт cfo_api с 8001 на 8002 во всех конфигурационных файлах
+- Цель 2: Добавить handler для команды /report в боте, который вызывает API для получения отчёта за текущий месяц
+- Фаза: Phase 1 — АНАЛИТИК (MVP)
+- Задачи: L1 (простая) и L2 (средняя)
+
+### Выполненные работы
+1. **Изменение порта cfo_api (Task #3):**
+   - Обновлён `docker-compose.yml`: команда, порты, healthcheck (8001 → 8002)
+   - Обновлён `docker-compose.override.yml`: порты (8001 → 8002)
+   - Обновлён `Makefile`: команда dev-api (--port 8001 → --port 8002)
+   - Обновлён `api/main.py`: порт в блоке `__main__` (8001 → 8002)
+   - Обновлены URL в боте:
+     - `bot/handlers/commands.py`: http://cfo_api:8001/health → http://cfo_api:8002/health
+     - `bot/handlers/csv_upload.py`: http://cfo_api:8001/ingest/csv → http://cfo_api:8002/ingest/csv
+   - Добавлены `venv311/`, `venv/`, `.venv/` в `.gitignore` и удалён `venv311/` из git cache
+   - Выполнен git commit + push
+
+2. **Добавление команды /report (Task #4):**
+   - Добавлен импорт `datetime` и `timedelta` в `bot/handlers/commands.py`
+   - Добавлен handler `cmd_report` с декоратором `@router.message(Command("report"))`
+   - Handler вычисляет даты текущего месяца (первый и последний день)
+   - Выполняет GET запрос к API `http://cfo_api:8002/report/period?from=...&to=...`
+   - Обрабатывает ошибки подключения и HTTP ошибки
+   - Форматирует ответ согласно спецификации:
+     ```
+     📊 Отчёт за [период]
+     
+     💰 Доходы: [total_income]
+     💸 Расходы: [total_expenses]
+     💵 Чистые сбережения: [net_savings]
+     
+     🤖 AI вердикт:
+     (недоступно)
+     ```
+   - Обновлён список команд в `cmd_start` (добавлена строка `/report — финансовый отчёт за текущий месяц`)
+   - Выполнен git commit + push
+
+### Технические детали
+- **Вычисление дат месяца:** Используется `datetime.now().date()` и арифметика с `timedelta`
+- **Graceful fallback:** При отсутствии AI вердикта в ответе API выводится заглушка "(недоступно)"
+- **Совместимость:** API endpoint `/report/period` ожидает параметры `from` и `to`, а не `period=this_month`. Handler адаптирован под текущую реализацию API.
+- **Порт 8002:** Все компоненты теперь используют порт 8002 (включая healthcheck и внутренние ссылки)
+
+### Observations outside scope
+- API endpoint `/report/period` не возвращает поле `ai_verdict` в JSON ответе (только логирует). Для полноценной интеграции потребуется доработка модели `PeriodReport`.
+- В файле `.github/workflows/deploy.yml` отсутствует curl команда для проверки health (не требуется для текущей задачи).
+
+### Результаты
+- **Definition of Done выполнены:** Все чекбоксы TASK.md отмечены
+- **PROJECT_SNAPSHOT.md обновлён:** v0.3-alpha, Task #3 и #4 ЗАВЕРШЁНЫ
+- **Git commits:**
+  - `8af4e45` — "chore: change cfo_api port from 8001 to 8002"
+  - `9b86b73` — "feat: add /report command handler for monthly financial report"
+
+---
 
 ## Сессия: Phase 1, Task #2 — AI вердикт + /report эндпоинт (исправление D-09)
 **Дата:** 2026-04-04
@@ -141,8 +203,7 @@
 
 ### Связь с Task #2
 Заполнение STRATEGY.md было предварительным шагом для Task #2, где AI вердикт использует эти данные для сравнения с фактическими транзакциями.
-3. Проверить что все placeholder'ы заменены
 
 ---
 
-**Следующая сессия:** Заполнение STRATEGY.md (реализация)
+**Следующая сессия:** Развертывание Phase 1 в production и E2E валидация

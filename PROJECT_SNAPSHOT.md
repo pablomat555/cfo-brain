@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 2026-04-04T18:24:45Z
+Последнее обновление: 2026-04-05T20:05:22Z
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -12,7 +12,7 @@
 - **Flow:** Telegram → Bot Gateway → CFO Brain API → ETL Pipeline → SQLite → Response
 - **Компоненты:**
   - `bot/` — Telegram gateway (aiogram 3.x), приём команд и CSV файлов
-  - `api/` — FastAPI, бизнес-логика CFO, эндпоинты /ingest/csv, /health
+  - `api/` — FastAPI, бизнес-логика CFO, эндпоинты /ingest/csv, /health, /report/period
   - `core/` — модели данных, конфигурация, работа с БД
   - `etl/` — парсинг CSV, загрузка транзакций, обработка non-breaking spaces
   - `data/` — SQLite база данных (cfo.db)
@@ -30,39 +30,40 @@
   - `LOG_LEVEL` (по умолчанию INFO)
 
 ## 4. Текущее состояние
-- **Версия:** v0.2-alpha
-- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН
+- **Версия:** v0.3-alpha
+- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН, Task #3 (port change) ЗАВЕРШЁН, Task #4 (/report handler) ЗАВЕРШЁН
 
 ### Что работает
 - ✅ Полная структура repo создана (14+ файлов)
 - ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite
-- ✅ API: FastAPI с эндпоинтом POST /ingest/csv
-- ✅ Bot: aiogram 3.x, обработка команд /start, /status и CSV файлов
-- ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck
+- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period
+- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report и CSV файлов
+- ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002)
 - ✅ Doppler integration: переменные окружения инжектятся через environment
-- ✅ Makefile: команды make dev-api, make up, make logs
+- ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
 - ✅ Уникальный constraint: (date, amount, account, description)
 - ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты
 - ✅ AI-анализ транзакций через OpenRouter (core/ai_verdict.py)
 - ✅ Эндпоинт /report/period для генерации отчётов (api/routers/report.py)
 - ✅ Модель PeriodReport с полем period_type (core/models.py)
 - ✅ Агрегация транзакций (analytics/aggregator.py)
+- ✅ Команда /report в боте: получает отчёт за текущий месяц через API
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
+- ⚠️ AI вердикт не возвращается в ответе API (только логируется) — требуется доработка модели PeriodReport
 
 ## 5. Фокус сессии
-- **Цель:** Планирование Phase 2 — НАБЛЮДАТЕЛЬ (история транзакций, тренды, аномалии)
-- **Last Commit:** 01ee472 — "feat: Phase 1 Task #2 — AI verdict + /report/period endpoint" (2026-04-04)
-- **Git Status:** Все изменения Task #2 закоммичены, репозиторий синхронизирован
+- **Цель:** Развертывание Phase 1 в production и E2E валидация
+- **Last Commit:** 9b86b73 — "feat: add /report command handler for monthly financial report" (2026-04-05)
+- **Git Status:** Все изменения закоммичены, репозиторий синхронизирован
 
-### Definition of Done (Phase 1, Task #2)
-- [x] AI-анализ транзакций через OpenRouter (core/ai_verdict.py)
-- [x] Эндпоинт /report/period для генерации отчётов (api/routers/report.py)
-- [x] Модель PeriodReport с полем period_type (core/models.py)
-- [x] Агрегация транзакций (analytics/aggregator.py)
-- [x] STRATEGY.md заполнен реальными данными (версия 1.0)
-- [x] D-09 записан в DECISION_LOG.md
+### Definition of Done (Phase 1, Task #4 — /report handler)
+- [x] Handler `/report` добавлен в `bot/handlers/commands.py`
+- [x] Handler корректно вызывает API endpoint с правильными параметрами
+- [x] Ответ форматируется согласно спецификации
+- [x] Команда `/report` упомянута в списке команд в `cmd_start`
+- [x] Изменения закоммичены и запушены в репозиторий
 
 ## Следующий шаг
 **D-11 CI/CD реализован — ожидает ручных шагов от пользователя**

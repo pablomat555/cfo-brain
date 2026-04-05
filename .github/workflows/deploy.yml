@@ -1,0 +1,41 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+          
+      - name: Add VPS host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Deploy via SSH
+        run: |
+          ssh -o StrictHostKeyChecking=yes \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && \
+             git pull --ff-only origin main && \
+             doppler run --project cfo-brain --config prd -- \
+               docker compose up -d --build"
+             
+      - name: Verify deployment
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && \
+             docker compose ps && \
+             echo 'Deployment completed successfully'"

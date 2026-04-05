@@ -1,62 +1,59 @@
-# TASK: Переименовать роут /report/monthly → /report/period и класс MonthlyReport → PeriodReport
+# TASK: Изменить порт cfo_api с 8000 на 8001
 
-**Создан:** 2026-04-04
+**Создан:** 2026-04-05
 **Уровень:** L2
 **Статус:** pending
 
 ## Цель
-Изменить название роута с `/report/monthly` на `/report/period` и переименовать класс `MonthlyReport` в `PeriodReport` с добавлением поля `period_type: str`. Обеспечить работоспособность всей кодовой базы после переименования.
+Изменить порт API сервиса cfo_api с 8000 на 8001 во всех конфигурационных файлах и точках обращения к API.
 
 ## Scope
-Файлы в scope:
-- `api/routers/report.py` — переименовать роут с `/report/monthly` на `/report/period`
-- `core/models.py` — переименовать класс `MonthlyReport` → `PeriodReport`, добавить поле `period_type: str`
-- `analytics/aggregator.py` — обновить импорт MonthlyReport → PeriodReport
-- `core/ai_verdict.py` — обновить импорт MonthlyReport → PeriodReport
-- `api/main.py` — проверить импорты, обновить если нужно
+Файлы и директории в scope:
+- `docker-compose.yml` — изменить порты и health check
+- `docker-compose.override.yml` — изменить порты
+- `Makefile` — изменить порт в dev-api команде
+- `api/main.py` — изменить порт в блоке `if __name__ == "__main__"`
+- `bot/handlers/commands.py` — изменить URL health check
+- `bot/handlers/csv_upload.py` — изменить URL ingest endpoint
+- `.github/workflows/deploy.yml` — изменить health check порт если присутствует
 
 Вне scope (не трогать):
-- логика агрегации (кроме обновления импортов)
-- логика AI вердикта (кроме обновления импортов)
-- другие файлы, не использующие MonthlyReport
+- Все остальные файлы проекта
+- Конфигурационные файлы вне перечисленных
+- Git операции (commit, push) — выполняются после завершения задачи
 
 ## Шаги
-1. В файле `api/routers/report.py`:
-   - Изменить декоратор `@router.get("/monthly")` на `@router.get("/period")`
-   - Изменить название функции `get_monthly_report` на `get_period_report`
-   - Обновить docstring и комментарии
-   - Обновить импорт: `from core.models import MonthlyReport` → `from core.models import PeriodReport`
-   - Обновить тип возвращаемого значения: `MonthlyReport` → `PeriodReport`
-   - Обновить создание пустого отчёта: `MonthlyReport(...)` → `PeriodReport(...)`
+1. Изменить `docker-compose.yml`:
+   - Строка 4: `--port 8000` → `--port 8001`
+   - Строка 14: `"8000:8000"` → `"8001:8001"`
+   - Строка 16: `'http://localhost:8000/health'` → `'http://localhost:8001/health'`
 
-2. В файле `core/models.py`:
-   - Переименовать класс `MonthlyReport` в `PeriodReport`
-   - Добавить поле `period_type: str` в модель
-   - Обновить docstring с описанием класса
+2. Изменить `docker-compose.override.yml`:
+   - Строка 8: `"8000:8000"` → `"8001:8001"`
 
-3. В файле `analytics/aggregator.py`:
-   - Обновить импорт: `from core.models import MonthlyReport` → `from core.models import PeriodReport`
-   - Переименовать функцию `build_monthly_report` → `build_period_report` (обязательно)
-   - Обновить тип возвращаемого значения в функции `build_period_report`: `MonthlyReport` → `PeriodReport`
-   - Обновить все вызовы функции в коде (в `api/routers/report.py`)
+3. Изменить `Makefile`:
+   - Строка 14: `--port 8000` → `--port 8001`
 
-4. В файле `core/ai_verdict.py`:
-   - Обновить импорт: `from core.models import MonthlyReport` → `from core.models import PeriodReport`
-   - Обновить тип параметра в функции `generate_verdict`: `MonthlyReport` → `PeriodReport`
+4. Изменить `api/main.py`:
+   - Строка 30: `port=8000` → `port=8001`
 
-5. Проверить файл `api/main.py` на наличие импортов `MonthlyReport` и обновить их при необходимости.
+5. Изменить `bot/handlers/commands.py`:
+   - Строка 33: `"http://cfo_api:8000/health"` → `"http://cfo_api:8001/health"`
 
-6. Убедиться что нет других файлов, импортирующих `MonthlyReport` (поиск по кодовой базе).
+6. Изменить `bot/handlers/csv_upload.py`:
+   - Строка 27: `"http://cfo_api:8000/ingest/csv"` → `"http://cfo_api:8001/ingest/csv"`
+
+7. Проверить `.github/workflows/deploy.yml` на наличие health check с портом 8000 и изменить на 8001 если присутствует
+
+8. Проверить что нет других упоминаний порта 8000 в коде приложения (исключая vendor файлы)
 
 ## Definition of Done
-- [ ] Роут `/report/period` доступен в API
-- [ ] Класс `PeriodReport` существует с полем `period_type`
-- [ ] Импорты во всех файлах обновлены
-- [ ] Документация роута обновлена
-- [ ] Старый роут `/report/monthly` больше не существует
-- [ ] Нет ни одного упоминания MonthlyReport в кодовой базе
-- [ ] `make dev-api` запускается без ImportError
-- [ ] GET `/report/period` возвращает 200
+- [ ] Все 7 файлов изменены согласно спецификации
+- [ ] Docker Compose поднимается с новым портом (`make up`)
+- [ ] API доступен на порту 8001 (`curl localhost:8001/health`)
+- [ ] Бот может подключиться к API (`make dev-bot` или через Docker)
+- [ ] Health check проходит успешно
+- [ ] Изменения закоммичены и запушены в main (после ручного подтверждения)
 
 ## Observations outside scope
-(Engineer заполняет в конце)
+(Engineer заполняет в конце - наблюдения вне scope, не применённые)

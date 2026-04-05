@@ -50,20 +50,25 @@
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
-- ⚠️ STRATEGY.md содержит placeholder'ы вместо реальных значений (требуется заполнение)
 
 ## 5. Фокус сессии
-- **Цель:** Заполнение STRATEGY.md реальными данными (замена placeholder'ов на конкретные значения)
-- **Last Commit:** 0555f01 — "feat: Phase 1 Task #1 — scaffold + ETL pipeline" (2026-04-03)
-- **Git Status:** Репозиторий инициализирован, все файлы закоммичены
+- **Цель:** Планирование Phase 2 — НАБЛЮДАТЕЛЬ (история транзакций, тренды, аномалии)
+- **Last Commit:** 01ee472 — "feat: Phase 1 Task #2 — AI verdict + /report/period endpoint" (2026-04-04)
+- **Git Status:** Все изменения Task #2 закоммичены, репозиторий синхронизирован
 
-### Definition of Done (Phase 1, Task #1)
-- [x] Структура repo создана (все 14+ файлов)
-- [x] make dev-api работает (API поднимается локально)
-- [x] POST /ingest/csv принимает CSV и возвращает статистику
-- [x] Бот обрабатывает CSV файлы и отправляет их в API
-- [x] make up работает с Docker Compose (оба сервиса healthy)
-- [x] Doppler переменные инжектятся корректно (без env_file)
-- [x] Git репозиторий инициализирован и закоммичен
+### Definition of Done (Phase 1, Task #2)
+- [x] AI-анализ транзакций через OpenRouter (core/ai_verdict.py)
+- [x] Эндпоинт /report/period для генерации отчётов (api/routers/report.py)
+- [x] Модель PeriodReport с полем period_type (core/models.py)
+- [x] Агрегация транзакций (analytics/aggregator.py)
+- [x] STRATEGY.md заполнен реальными данными (версия 1.0)
+- [x] D-09 записан в DECISION_LOG.md
 
-**COMMAND:** Заполнить STRATEGY.md реальными данными для использования в AI-анализе и отчётах.
+## Следующий шаг
+**D-11 CI/CD реализован — ожидает ручных шагов от пользователя**
+- [x] GitHub Actions workflow создан (`.github/workflows/deploy.yml`)
+- [ ] Пользователь создаёт Doppler Service Token на VPS
+- [ ] Пользователь добавляет 4 GitHub Secrets (HOST, USERNAME, SSH_KEY, DEPLOY_PATH)
+- [ ] Пользователь клонирует repo на VPS и настраивает Doppler
+- [ ] Первый git push → проверить что Actions прошёл зелёным
+- [ ] End-to-end тест: CSV → Telegram → отчёт с AI вердиктом

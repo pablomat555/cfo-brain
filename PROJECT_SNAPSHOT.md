@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 2026-04-07T17:39:45Z
+Последнее обновление: 2026-04-07T18:16:21Z
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -30,8 +30,8 @@
   - `LOG_LEVEL` (по умолчанию INFO)
 
 ## 4. Текущее состояние
-- **Версия:** v0.4-alpha
-- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН, Task #3 (port change) ЗАВЕРШЁН, Task #4 (/report handler) ЗАВЕРШЁН, Task #5 (accounts.yml update) ЗАВЕРШЁН
+- **Версия:** v0.5-alpha
+- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН, Task #3 (port change) ЗАВЕРШЁН, Task #4 (/report handler) ЗАВЕРШЁН, Task #5 (accounts.yml update) ЗАВЕРШЁН, Task #6 (D-13 auto-period detection) ЗАВЕРШЁН
 
 ### Что работает
 - ✅ Полная структура repo создана (14+ файлов)
@@ -49,29 +49,32 @@
 - ✅ Агрегация транзакций (analytics/aggregator.py)
 - ✅ Команда /report в боте: получает отчёт за текущий месяц через API
 - ✅ AI вердикт возвращается в ответе API (исправлено в коммите ab9cfd0)
+- ✅ Автоопределение периода для команды /report (D-13): система запоминает даты последнего CSV и использует их при вызове /report без параметров
+- ✅ Поддержка параметра /report YYYY-MM для явного указания месяца
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
-- ⚠️ Команда /report не поддерживает автоопределение периода из последнего CSV (D-13) — требуется реализация
+- ⚠️ Двойной commit в etl/loader.py (один для upload session, другой для транзакций) — может быть оптимизировано
 
 ## 5. Фокус сессии
-- **Цель:** Реализация D-13 — улучшение команды /report с автоопределением периода
-- **Last Commit:** bea4434 — "Update accounts.yml with 13 accounts mapping" (2026-04-07)
-- **Git Status:** Есть нескоммиченные изменения: TASK.md удалён (архивирован в docs/tasks/), docs/tasks/TASK_2026-04-07_ai-verdict-fix.md добавлен
+- **Цель:** Завершение Phase 1 и подготовка к production deployment
+- **Last Commit:** e506021 — "feat: add auto-period detection for /report command (D-13)" (2026-04-07)
+- **Git Status:** Все изменения закоммичены и запушены. Остался нескоммиченный архивный файл docs/tasks/TASK_2026-04-07_ai-verdict-fix.md
 
-### Definition of Done (Phase 1, Task #5 — accounts.yml update)
-- [x] Обновлён accounts.yml с 13 аккаунтами
-- [x] Добавлены все соответствующие записи в parser_types
-- [x] Добавлен комментарий о процессе добавления новых аккаунтов
+### Definition of Done (Phase 1, Task #6 — D-13 auto-period detection)
+- [x] Модель UploadSession добавлена в core/models.py
+- [x] Таблица upload_sessions создаётся при инициализации БД
+- [x] etl/loader.py сохраняет метаданные после загрузки CSV
+- [x] api/routers/report.py использует последний upload session при отсутствии периода
+- [x] bot/handlers/commands.py поддерживает опциональный параметр /report YYYY-MM
+- [x] Автоопределение периода работает корректно
 - [x] Изменения закоммичены и запушены в репозиторий
 
 ## Следующий шаг
-**D-13: /report с автоопределением периода из последнего CSV**
-- [ ] Создать таблицу upload_sessions в БД
-- [ ] Обновить core/models.py — модель UploadSession
-- [ ] Обновить core/database.py — создание таблицы
-- [ ] Обновить etl/loader.py — сохранять upload session после загрузки
-- [ ] Обновить api/routers/report.py — читать последний upload session если период не указан
-- [ ] Обновить bot/handlers/commands.py — парсить опциональный параметр /report YYYY-MM
-- [ ] Протестировать автоопределение периода
-- [ ] Закоммитить и запушить изменения
+**D-11 CI/CD — ожидает ручных шагов от пользователя**
+- [x] GitHub Actions workflow создан (`.github/workflows/deploy.yml`)
+- [ ] Пользователь создаёт Doppler Service Token на VPS
+- [ ] Пользователь добавляет 4 GitHub Secrets (HOST, USERNAME, SSH_KEY, DEPLOY_PATH)
+- [ ] Пользователь клонирует repo на VPS и настраивает Doppler
+- [ ] Первый git push → проверить что Actions прошёл зелёным
+- [ ] End-to-end тест: CSV → Telegram → отчёт с AI вердиктом

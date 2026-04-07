@@ -219,7 +219,7 @@ def get_period_name(month_param: str | None) -> str:
 async def fetch_report(base_url: str, params: dict) -> dict | None:
     """Получает отчёт из API"""
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(base_url, params=params)
             
             if response.status_code == 200:

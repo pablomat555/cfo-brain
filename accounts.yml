@@ -1,15 +1,32 @@
 # Human-editable mapping of account names to currencies
 # New accounts must be added here manually
+# To add new account: add entry in both 'accounts' and 'parser_types' sections, then git push
 accounts:
   Payoneer: USD
   IBKR: USD
+  TrW: USD
+  "Bybit*": USD
+  "Binance*": USD
+  Steam: USD
+  "Mono USD": USD
+  "Аванс$": USD
   "Моно 8235": UAH
+  "Приват 8132": UAH
+  "Интернет карта": UAH
   Наличные: UAH
-  # Add new accounts as needed
+  Аванс: UAH
 
-# Parser type for each account (debit_credit, etc.)
 parser_types:
   Payoneer: debit_credit
   IBKR: debit_credit
+  TrW: debit_credit
+  "Bybit*": debit_credit
+  "Binance*": debit_credit
+  Steam: debit_credit
+  "Mono USD": debit_credit
+  "Аванс$": debit_credit
   "Моно 8235": debit_credit
+  "Приват 8132": debit_credit
+  "Интернет карта": debit_credit
   Наличные: debit_credit
+  Аванс: debit_credit

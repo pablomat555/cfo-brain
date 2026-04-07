@@ -29,7 +29,7 @@ def generate_verdict(report: PeriodReport, strategy: str) -> str:
     currency_info = ""
     if report.rate_type == "manual" and report.rate:
         currency_info = f"Курс конвертации: $1 = ₴{report.rate} (manual, приблизительно)\n"
-    elif report.rate_type == "split" and report.currency_breakdown:
+    elif report.rate_type == "split" and report.currency_breakdown is not None:
         currency_info = "Разбивка по валютам:\n"
         for curr, data in report.currency_breakdown.items():
             currency_info += f"- {curr}: доходы {data['total_income']}, расходы {data['total_expenses']}, сбережения {data['net_savings']}\n"

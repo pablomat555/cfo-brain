@@ -98,12 +98,12 @@ async def cmd_skip_rate(message: types.Message, state: FSMContext):
         has_month_param = data.get("has_month_param", False)
         month_param = data.get("month_param")
         
-        # Формируем URL для API
-        api_url = build_report_url(month_param, rate=None, rate_type="split")
+        # Формируем URL и параметры для API
+        base_url, params = build_report_url(month_param, rate=None, rate_type="split")
         period_name = get_period_name(month_param)
         
         # Получаем отчёт
-        report = await fetch_report(api_url)
+        report = await fetch_report(base_url, params)
         
         if report:
             # Форматируем ответ
@@ -132,26 +132,27 @@ async def cmd_cancel_rate(message: types.Message, state: FSMContext):
 async def process_rate_input(message: types.Message, state: FSMContext):
     """Обработчик ввода курса"""
     try:
-        # Пытаемся преобразовать ввод в число
+        # Пытаемся преобразовать ввод в число с поддержкой запятой
         rate_text = message.text.strip()
+        rate_text = rate_text.replace(",", ".")
         try:
             rate = float(rate_text)
             if rate <= 0:
                 raise ValueError("Курс должен быть положительным числом")
         except ValueError:
-            await message.reply("❌ **Неверный формат курса.**\nВведите число (например, 41.5) или /skip для раздельного отчёта", parse_mode="Markdown")
+            await message.reply("❌ **Неверный формат курса.**\nВведите число (например, 41.5 или 41,5) или /skip для раздельного отчёта", parse_mode="Markdown")
             return
         
         data = await state.get_data()
         has_month_param = data.get("has_month_param", False)
         month_param = data.get("month_param")
         
-        # Формируем URL для API
-        api_url = build_report_url(month_param, rate=rate, rate_type="manual")
+        # Формируем URL и параметры для API
+        base_url, params = build_report_url(month_param, rate=rate, rate_type="manual")
         period_name = get_period_name(month_param)
         
         # Получаем отчёт
-        report = await fetch_report(api_url)
+        report = await fetch_report(base_url, params)
         
         if report:
             # Форматируем ответ
@@ -170,9 +171,10 @@ async def process_rate_input(message: types.Message, state: FSMContext):
 
 
 # Вспомогательные функции
-def build_report_url(month_param: str | None, rate: float | None, rate_type: str) -> str:
-    """Строит URL для запроса отчёта"""
+def build_report_url(month_param: str | None, rate: float | None, rate_type: str) -> tuple[str, dict]:
+    """Строит URL и параметры для запроса отчёта"""
     base_url = "http://cfo_api:8002/report/period"
+    params = {}
     
     if month_param:
         try:
@@ -184,22 +186,21 @@ def build_report_url(month_param: str | None, rate: float | None, rate_type: str
                 next_month = month_date.replace(month=month_date.month + 1, day=1)
             last_day = next_month - timedelta(days=1)
             
-            from_date = first_day.strftime("%Y-%m-%d")
-            to_date = last_day.strftime("%Y-%m-%d")
-            url = f"{base_url}?from={from_date}&to={to_date}"
+            params["from"] = first_day.strftime("%Y-%m-%d")
+            params["to"] = last_day.strftime("%Y-%m-%d")
         except ValueError:
             # Если месяц неверный, используем автоопределение
-            url = base_url
-    else:
-        url = base_url
+            pass
+    # Если month_param нет или ошибка, API сам определит период
     
     # Добавляем параметры курса
     if rate_type == "manual" and rate:
-        url += f"&rate={rate}&rate_type=manual"
+        params["rate"] = rate
+        params["rate_type"] = "manual"
     else:
-        url += "&rate_type=split"
+        params["rate_type"] = "split"
     
-    return url
+    return base_url, params
 
 
 def get_period_name(month_param: str | None) -> str:
@@ -214,11 +215,11 @@ def get_period_name(month_param: str | None) -> str:
         return "автоматически определённый период"
 
 
-async def fetch_report(api_url: str) -> dict | None:
+async def fetch_report(base_url: str, params: dict) -> dict | None:
     """Получает отчёт из API"""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(api_url)
+            response = await client.get(base_url, params=params)
             
             if response.status_code == 200:
                 return response.json()

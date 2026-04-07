@@ -1,4 +1,5 @@
 import httpx
+import traceback
 from aiogram import types, Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -116,7 +117,7 @@ async def cmd_skip_rate(message: types.Message, state: FSMContext):
         await state.clear()
         
     except Exception as e:
-        logger.error(f"Error in cmd_skip_rate: {e}")
+        logger.error(f"Error in cmd_skip_rate: {e}\n{traceback.format_exc()}")
         await message.reply(f"❌ **Ошибка:** {str(e)}", parse_mode="Markdown")
         await state.clear()
 
@@ -165,7 +166,7 @@ async def process_rate_input(message: types.Message, state: FSMContext):
         await state.clear()
         
     except Exception as e:
-        logger.error(f"Error in process_rate_input: {e}")
+        logger.error(f"Error in process_rate_input: {e}\n{traceback.format_exc()}")
         await message.reply(f"❌ **Ошибка:** {str(e)}", parse_mode="Markdown")
         await state.clear()
 
@@ -231,7 +232,7 @@ async def fetch_report(base_url: str, params: dict) -> dict | None:
         logger.error("Cannot connect to API")
         return None
     except Exception as e:
-        logger.error(f"Error fetching report: {e}")
+        logger.error(f"Error fetching report: {e}\n{traceback.format_exc()}")
         return None
 
 
@@ -267,13 +268,13 @@ def format_split_report(report: dict, period_name: str) -> str:
     total_expenses = report.get("total_expenses", 0)
     net_savings = report.get("net_savings", 0)
     ai_verdict = report.get("ai_verdict")
-    currency_breakdown = report.get("currency_breakdown", {})
+    currency_breakdown = report.get("currency_breakdown")
     
     # Основной отчёт
     reply_text = f"📊 Отчёт за {period_name}\n"
     
     # Добавляем разбивку по валютам если есть
-    if currency_breakdown:
+    if currency_breakdown is not None and currency_breakdown:
         for currency, data in currency_breakdown.items():
             currency_symbol = "₴" if currency == "UAH" else "$" if currency == "USD" else currency
             income = data.get("total_income", 0)

@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from sqlalchemy import Column, Integer, Date, String, DateTime, Numeric, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel
@@ -43,6 +43,7 @@ class PeriodReport(BaseModel):
     month: datetime
     currency: str = "UAH"
     period_type: str = "custom"  # custom, this_month, previous_month
+    ai_verdict: Optional[str] = None
     
     class Config:
         json_encoders = {

@@ -81,13 +81,19 @@ async def cmd_report(message: types.Message):
                 total_income = report.get("total_income", 0)
                 total_expenses = report.get("total_expenses", 0)
                 net_savings = report.get("net_savings", 0)
+                ai_verdict = report.get("ai_verdict")
+                
+                if ai_verdict:
+                    verdict_text = ai_verdict
+                else:
+                    verdict_text = "AI анализ недоступен (ключ API не настроен или произошла ошибка)"
                 
                 reply_text = (
                     f"📊 Отчёт за {first_day.strftime('%B %Y')}\n\n"
                     f"💰 Доходы: {total_income:.2f}\n"
                     f"💸 Расходы: {total_expenses:.2f}\n"
                     f"💵 Чистые сбережения: {net_savings:.2f}\n\n"
-                    f"🤖 AI вердикт:\n(недоступно)"
+                    f"🤖 AI вердикт:\n{verdict_text}"
                 )
             else:
                 reply_text = "❌ **Не удалось получить отчёт**\nПроверьте, запущен ли сервис."

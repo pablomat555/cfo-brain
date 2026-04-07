@@ -79,7 +79,8 @@ async def get_period_report(
                 top_expenses=[],
                 month=from_dt,
                 currency=currency or "UAH",
-                period_type="custom"
+                period_type="custom",
+                ai_verdict=None
             )
             return empty_report
         
@@ -90,15 +91,11 @@ async def get_period_report(
         strategy = read_strategy_file()
         ai_verdict = generate_verdict(report, strategy)
         
-        # Добавляем AI вердикт в отчёт как дополнительное поле
-        # (но поскольку PeriodReport не имеет этого поля, мы вернём его отдельно)
-        # Для совместимости с response_model, мы не можем изменить структуру PeriodReport
-        # Вместо этого добавим вердикт в метаданные ответа через заголовки или отдельное поле
-        # Пока что просто логируем
+        # Добавляем AI вердикт в отчёт
         logger.info(f"AI verdict generated: {ai_verdict[:100]}...")
         
-        # Возвращаем отчёт
-        return report
+        # Возвращаем отчёт с вердиктом
+        return report.copy(update={"ai_verdict": ai_verdict})
         
     except HTTPException:
         raise

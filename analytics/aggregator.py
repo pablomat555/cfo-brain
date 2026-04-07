@@ -29,7 +29,8 @@ def build_period_report(transactions: List[Transaction]) -> PeriodReport:
             top_expenses=[],
             month=datetime.now(),
             currency="UAH",
-            period_type="custom"
+            period_type="custom",
+            ai_verdict=None
         )
     
     # Инициализация агрегаторов
@@ -120,5 +121,6 @@ def build_period_report(transactions: List[Transaction]) -> PeriodReport:
         top_expenses=top_expenses,
         month=month,
         currency=currency,
-        period_type=period_type
+        period_type=period_type,
+        ai_verdict=None
     )

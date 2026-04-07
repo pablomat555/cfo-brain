@@ -21,7 +21,8 @@ async def cmd_start(message: types.Message):
         "⚡ **Доступные команды:**\n"
         "/start — это сообщение\n"
         "/status — статус системы\n"
-        "/report — финансовый отчёт за текущий месяц\n\n"
+        "/report — финансовый отчёт (автоопределение периода из последнего CSV)\n"
+        "/report YYYY-MM — отчёт за конкретный месяц (например, /report 2026-03)\n\n"
         "Отправь мне CSV файл чтобы начать!"
     )
     await message.reply(welcome_text, parse_mode="Markdown")
@@ -58,26 +59,41 @@ async def cmd_status(message: types.Message):
 async def cmd_report(message: types.Message):
     """Обработчик команды /report"""
     try:
-        # Вычисляем даты текущего месяца
-        today = datetime.now().date()
-        first_day = today.replace(day=1)
-        # Последний день месяца: первый день следующего месяца минус один день
-        if today.month == 12:
-            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        # Парсим параметр команды (опциональный месяц в формате YYYY-MM)
+        command_text = message.text.strip()
+        parts = command_text.split()
+        
+        if len(parts) > 1:
+            # Пользователь указал месяц
+            month_param = parts[1]
+            try:
+                month_date = datetime.strptime(month_param, "%Y-%m").date()
+                first_day = month_date.replace(day=1)
+                if month_date.month == 12:
+                    next_month = month_date.replace(year=month_date.year + 1, month=1, day=1)
+                else:
+                    next_month = month_date.replace(month=month_date.month + 1, day=1)
+                last_day = next_month - timedelta(days=1)
+                
+                from_date = first_day.strftime("%Y-%m-%d")
+                to_date = last_day.strftime("%Y-%m-%d")
+                api_url = f"http://cfo_api:8002/report/period?from={from_date}&to={to_date}"
+                period_name = first_day.strftime("%B %Y")
+            except ValueError:
+                await message.reply("❌ **Неверный формат месяца.** Используйте /report YYYY-MM (например, /report 2026-03)")
+                return
         else:
-            next_month = today.replace(month=today.month + 1, day=1)
-        last_day = next_month - timedelta(days=1)
-        
-        from_date = first_day.strftime("%Y-%m-%d")
-        to_date = last_day.strftime("%Y-%m-%d")
-        
+            # Без параметра - автоопределение периода
+            api_url = "http://cfo_api:8002/report/period"
+            period_name = "автоматически определённый период"
+
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                f"http://cfo_api:8002/report/period?from={from_date}&to={to_date}"
-            )
+            response = await client.get(api_url)
             
             if response.status_code == 200:
                 report = response.json()
+                # Получаем фактический период из отчёта
+                report_month = datetime.fromisoformat(report.get("month")).date()
                 total_income = report.get("total_income", 0)
                 total_expenses = report.get("total_expenses", 0)
                 net_savings = report.get("net_savings", 0)
@@ -89,7 +105,7 @@ async def cmd_report(message: types.Message):
                     verdict_text = "AI анализ недоступен (ключ API не настроен или произошла ошибка)"
                 
                 reply_text = (
-                    f"📊 Отчёт за {first_day.strftime('%B %Y')}\n\n"
+                    f"📊 Отчёт за {period_name}\n\n"
                     f"💰 Доходы: {total_income:.2f}\n"
                     f"💸 Расходы: {total_expenses:.2f}\n"
                     f"💵 Чистые сбережения: {net_savings:.2f}\n\n"

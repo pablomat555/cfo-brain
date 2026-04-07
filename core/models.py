@@ -49,3 +49,18 @@ class PeriodReport(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+class UploadSession(Base):
+    """Модель для хранения метаданных загрузки CSV файлов"""
+    __tablename__ = "upload_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    min_date = Column(Date, nullable=False)
+    max_date = Column(Date, nullable=False)
+    transactions_count = Column(Integer, nullable=False)
+
+    def __repr__(self):
+        return f"<UploadSession(id={self.id}, uploaded_at={self.uploaded_at}, " \
+               f"min_date={self.min_date}, max_date={self.max_date}, count={self.transactions_count})>"

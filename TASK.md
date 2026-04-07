@@ -1,59 +1,67 @@
-# TASK: Исправить AI вердикт в /report
+# TASK: Улучшение команды /report — автоопределение периода из последнего CSV
 
-**Создан:** 2026-04-07
+**Создан:** 2026-04-07T17:42:13Z
 **Уровень:** L2
 **Статус:** pending
 
 ## Цель
-Исправить проблему, когда поле `ai_verdict` генерируется, но не возвращается в ответе API `/report/period` и не отображается ботом.
+Добавить автоопределение периода для команды `/report` на основе дат последнего загруженного CSV файла.
 
 ## Scope
 Файлы и директории в scope:
-- `core/models.py` - добавить поле `ai_verdict` в модель `PeriodReport`
-- `analytics/aggregator.py` - возможно обновить функцию `build_period_report` для поддержки `ai_verdict`
-- `api/routers/report.py` - включить сгенерированный AI вердикт в возвращаемый объект `PeriodReport`
-- `bot/handlers/commands.py` - читать поле `ai_verdict` из ответа API и отображать его
+- [`core/models.py`](core/models.py) — добавление модели UploadSession
+- [`core/database.py`](core/database.py) — создание таблицы upload_sessions
+- [`etl/loader.py`](etl/loader.py) — сохранение метаданных загрузки после успешного ingest
+- [`api/routers/report.py`](api/routers/report.py) — чтение последнего upload session при отсутствии явного периода
+- [`bot/handlers/commands.py`](bot/handlers/commands.py) — парсинг опционального параметра /report YYYY-MM
 
 Вне scope (не трогать):
 - все остальные файлы
-- логика генерации AI вердикта (остаётся без изменений)
-- стратегия чтения файла STRATEGY.md
-- любые другие эндпоинты или команды бота
+- миграции БД (используется auto-create при запуске)
+- изменение существующей логики агрегации отчётов
 
 ## Шаги
-1. **Обновить модель PeriodReport** (`core/models.py`):
-   - Добавить опциональное поле `ai_verdict: Optional[str] = None`
-   - Убедиться, что поле сериализуется в JSON
+1. **Добавить модель UploadSession в [`core/models.py`](core/models.py)**
+   - Поля: id (Integer, primary_key), uploaded_at (DateTime, default=datetime.utcnow), min_date (Date), max_date (Date), transactions_count (Integer)
+   - Наследовать от Base
 
-2. **Обновить агрегатор** (`analytics/aggregator.py`):
-   - Добавить параметр `ai_verdict: Optional[str] = None` в функцию `build_period_report`
-   - Включить это поле в создаваемый объект `PeriodReport`
-   - ИЛИ оставить как есть, если вердикт будет добавлен на уровне API (предпочтительнее)
+2. **Обновить [`core/database.py`](core/database.py) для создания таблицы**
+   - Добавить UploadSession в метаданные Base.metadata
+   - Убедиться, что таблица создаётся при инициализации БД
 
-3. **Обновить эндпоинт /report/period** (`api/routers/report.py`):
-   - После генерации AI вердикта (строка 91) создать обновлённый объект `PeriodReport` с полем `ai_verdict`
-   - Использовать `report.copy(update={"ai_verdict": ai_verdict})` или создать новый экземпляр
-   - Вернуть обновлённый объект вместо оригинального
+3. **Обновить [`etl/loader.py`](etl/loader.py) для сохранения upload session**
+   - После успешной загрузки транзакций вычислить min_date и max_date
+   - Создать запись UploadSession с метаданными
+   - Сохранить в БД через сессию
 
-4. **Обновить обработчик команды /report** (`bot/handlers/commands.py`):
-   - Извлечь `ai_verdict` из JSON ответа: `report.get("ai_verdict")`
-   - Заменить строку `"(недоступно)"` на фактический вердикт или fallback текст
-   - Форматировать вывод вердикта в сообщении бота
+4. **Обновить [`api/routers/report.py`](api/routers/report.py) для автоопределения периода**
+   - Добавить логику: если период не указан в запросе, получить последний UploadSession
+   - Если UploadSession существует, использовать min_date и max_date как период
+   - Если нет, fallback на текущий месяц (существующая логика)
 
-5. **Протестировать изменения**:
-   - Запустить сервисы локально (`make up`)
-   - Отправить команду `/report` в бота
-   - Убедиться, что AI вердикт отображается в ответе
+5. **Обновить [`bot/handlers/commands.py`](bot/handlers/commands.py) для поддержки параметра**
+   - Модифицировать обработчик команды `/report` для парсинга опционального параметра YYYY-MM
+   - Передавать параметр в API endpoint (или null для автоопределения)
+   - Обновить документацию команды в ответе
 
-6. **Сделать git commit и push**:
-   - Закоммитить изменения с сообщением `fix: include ai_verdict in PeriodReport API response`
-   - Запушить в репозиторий
+6. **Протестировать функциональность**
+   - Загрузить тестовый CSV через бота
+   - Проверить создание записи в таблице upload_sessions
+   - Вызвать `/report` без параметров → должен использовать период из CSV
+   - Вызвать `/report 2026-03` → должен использовать указанный месяц
+   - Проверить fallback на текущий месяц при отсутствии upload session
+
+7. **Закоммитить и запушить изменения**
+   - Создать осмысленный коммит с описанием изменений
+   - Выполнить git push
 
 ## Definition of Done
-- [ ] Поле `ai_verdict` добавлено в модель `PeriodReport` в `core/models.py`
-- [ ] Эндпоинт `/report/period` возвращает объект с полем `ai_verdict`, содержащим сгенерированный вердикт
-- [ ] Обработчик команды `/report` в боте отображает AI вердикт из ответа API
-- [ ] Команда `/report` показывает вердикт вместо `"(недоступно)"`
+- [ ] Модель UploadSession добавлена в [`core/models.py`](core/models.py)
+- [ ] Таблица upload_sessions создаётся при инициализации БД
+- [ ] [`etl/loader.py`](etl/loader.py) сохраняет метаданные после загрузки CSV
+- [ ] [`api/routers/report.py`](api/routers/report.py) использует последний upload session при отсутствии периода
+- [ ] [`bot/handlers/commands.py`](bot/handlers/commands.py) поддерживает опциональный параметр YYYY-MM
+- [ ] Автоопределение периода работает корректно (тестирование)
 - [ ] Изменения закоммичены и запушены в репозиторий
 
 ## Observations outside scope

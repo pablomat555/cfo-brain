@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from loguru import logger
 from pydantic import BaseModel
 
-from core.models import Transaction
+from core.models import Transaction, UploadSession
 from etl.parser import TransactionRaw
 
 
@@ -57,6 +57,28 @@ def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str 
             db.rollback()
             result.errors += 1
             logger.error(f"Error loading transaction {row}: {e}")
+    
+    # Сохраняем метаданные загрузки если транзакции были успешно загружены
+    if result.inserted > 0:
+        try:
+            # Вычисляем min_date и max_date из загруженных транзакций
+            dates = [row.date.date() for row in rows]
+            min_date = min(dates)
+            max_date = max(dates)
+            
+            upload_session = UploadSession(
+                min_date=min_date,
+                max_date=max_date,
+                transactions_count=result.inserted,
+                uploaded_at=datetime.utcnow()
+            )
+            db.add(upload_session)
+            db.commit()
+            logger.info(f"Upload session saved: {min_date} to {max_date}, {result.inserted} transactions")
+            
+        except Exception as e:
+            logger.error(f"Failed to save upload session: {e}")
+            # Не прерываем процесс, только логируем ошибку
     
     try:
         db.commit()

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -6,7 +6,7 @@ from sqlalchemy import and_
 from loguru import logger
 
 from core.database import get_db
-from core.models import Transaction, PeriodReport
+from core.models import Transaction, PeriodReport, UploadSession
 from analytics.aggregator import build_period_report
 from core.ai_verdict import generate_verdict, read_strategy_file
 
@@ -15,8 +15,8 @@ router = APIRouter(prefix="/report", tags=["report"])
 
 @router.get("/period", response_model=PeriodReport)
 async def get_period_report(
-    from_date: str = Query(..., alias="from", description="Начальная дата в формате YYYY-MM-DD"),
-    to_date: str = Query(..., alias="to", description="Конечная дата в формате YYYY-MM-DD"),
+    from_date: Optional[str] = Query(None, alias="from", description="Начальная дата в формате YYYY-MM-DD (опционально)"),
+    to_date: Optional[str] = Query(None, alias="to", description="Конечная дата в формате YYYY-MM-DD (опционально)"),
     currency: Optional[str] = Query(None, description="Фильтр по валюте (например, UAH, USD)"),
     account: Optional[str] = Query(None, description="Фильтр по счёту (например, Payoneer, Моно)"),
     db: Session = Depends(get_db)
@@ -25,8 +25,8 @@ async def get_period_report(
     Возвращает финансовый отчёт за период с AI-вердиктом.
     
     Параметры:
-    - from: начальная дата (YYYY-MM-DD)
-    - to: конечная дата (YYYY-MM-DD)
+    - from: начальная дата (YYYY-MM-DD) - опционально, если не указано, используется период из последнего CSV
+    - to: конечная дата (YYYY-MM-DD) - опционально, если не указано, используется период из последнего CSV
     - currency (опционально): фильтр по валюте
     - account (опционально): фильтр по счёту
     
@@ -35,14 +35,38 @@ async def get_period_report(
     - /report/period?from=2026-01-01&to=2026-03-31 (первый квартал)
     - /report/period?from=2026-04-01&to=2026-04-15&currency=USD (первые 2 недели апреля, только USD)
     - /report/period?from=2026-04-01&to=2026-04-30&account=Payoneer (апрель, только счёт Payoneer)
+    - /report/period (автоопределение периода из последнего CSV)
     """
     try:
-        # Парсим даты
-        try:
-            from_dt = datetime.strptime(from_date, "%Y-%m-%d").date()
-            to_dt = datetime.strptime(to_date, "%Y-%m-%d").date()
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid date format: {e}. Use YYYY-MM-DD")
+        # Автоопределение периода если даты не указаны
+        if not from_date or not to_date:
+            # Получаем последний upload session
+            last_session = db.query(UploadSession).order_by(UploadSession.uploaded_at.desc()).first()
+            
+            if last_session:
+                from_dt = last_session.min_date
+                to_dt = last_session.max_date
+                logger.info(f"Using auto-detected period from upload session: {from_dt} to {to_dt}")
+            else:
+                # Fallback на текущий месяц
+                today = datetime.now().date()
+                first_day = today.replace(day=1)
+                if today.month == 12:
+                    next_month = today.replace(year=today.year + 1, month=1, day=1)
+                else:
+                    next_month = today.replace(month=today.month + 1, day=1)
+                last_day = next_month - timedelta(days=1)
+                
+                from_dt = first_day
+                to_dt = last_day
+                logger.info(f"No upload session found, using current month: {from_dt} to {to_dt}")
+        else:
+            # Используем указанные даты
+            try:
+                from_dt = datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_dt = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid date format: {e}. Use YYYY-MM-DD")
         
         if from_dt > to_dt:
             raise HTTPException(status_code=400, detail="from date cannot be after to date")

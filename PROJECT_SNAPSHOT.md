@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 2026-04-05T20:05:22Z
+Последнее обновление: 2026-04-07T17:39:45Z
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -30,8 +30,8 @@
   - `LOG_LEVEL` (по умолчанию INFO)
 
 ## 4. Текущее состояние
-- **Версия:** v0.3-alpha
-- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН, Task #3 (port change) ЗАВЕРШЁН, Task #4 (/report handler) ЗАВЕРШЁН
+- **Версия:** v0.4-alpha
+- **Статус:** Phase 1, Task #1 ЗАВЕРШЁН, Task #2 ЗАВЕРШЁН, Task #3 (port change) ЗАВЕРШЁН, Task #4 (/report handler) ЗАВЕРШЁН, Task #5 (accounts.yml update) ЗАВЕРШЁН
 
 ### Что работает
 - ✅ Полная структура repo создана (14+ файлов)
@@ -42,34 +42,36 @@
 - ✅ Doppler integration: переменные окружения инжектятся через environment
 - ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
 - ✅ Уникальный constraint: (date, amount, account, description)
-- ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты
+- ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты (13 аккаунтов)
 - ✅ AI-анализ транзакций через OpenRouter (core/ai_verdict.py)
 - ✅ Эндпоинт /report/period для генерации отчётов (api/routers/report.py)
 - ✅ Модель PeriodReport с полем period_type (core/models.py)
 - ✅ Агрегация транзакций (analytics/aggregator.py)
 - ✅ Команда /report в боте: получает отчёт за текущий месяц через API
+- ✅ AI вердикт возвращается в ответе API (исправлено в коммите ab9cfd0)
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
-- ⚠️ AI вердикт не возвращается в ответе API (только логируется) — требуется доработка модели PeriodReport
+- ⚠️ Команда /report не поддерживает автоопределение периода из последнего CSV (D-13) — требуется реализация
 
 ## 5. Фокус сессии
-- **Цель:** Развертывание Phase 1 в production и E2E валидация
-- **Last Commit:** 9b86b73 — "feat: add /report command handler for monthly financial report" (2026-04-05)
-- **Git Status:** Все изменения закоммичены, репозиторий синхронизирован
+- **Цель:** Реализация D-13 — улучшение команды /report с автоопределением периода
+- **Last Commit:** bea4434 — "Update accounts.yml with 13 accounts mapping" (2026-04-07)
+- **Git Status:** Есть нескоммиченные изменения: TASK.md удалён (архивирован в docs/tasks/), docs/tasks/TASK_2026-04-07_ai-verdict-fix.md добавлен
 
-### Definition of Done (Phase 1, Task #4 — /report handler)
-- [x] Handler `/report` добавлен в `bot/handlers/commands.py`
-- [x] Handler корректно вызывает API endpoint с правильными параметрами
-- [x] Ответ форматируется согласно спецификации
-- [x] Команда `/report` упомянута в списке команд в `cmd_start`
+### Definition of Done (Phase 1, Task #5 — accounts.yml update)
+- [x] Обновлён accounts.yml с 13 аккаунтами
+- [x] Добавлены все соответствующие записи в parser_types
+- [x] Добавлен комментарий о процессе добавления новых аккаунтов
 - [x] Изменения закоммичены и запушены в репозиторий
 
 ## Следующий шаг
-**D-11 CI/CD реализован — ожидает ручных шагов от пользователя**
-- [x] GitHub Actions workflow создан (`.github/workflows/deploy.yml`)
-- [ ] Пользователь создаёт Doppler Service Token на VPS
-- [ ] Пользователь добавляет 4 GitHub Secrets (HOST, USERNAME, SSH_KEY, DEPLOY_PATH)
-- [ ] Пользователь клонирует repo на VPS и настраивает Doppler
-- [ ] Первый git push → проверить что Actions прошёл зелёным
-- [ ] End-to-end тест: CSV → Telegram → отчёт с AI вердиктом
+**D-13: /report с автоопределением периода из последнего CSV**
+- [ ] Создать таблицу upload_sessions в БД
+- [ ] Обновить core/models.py — модель UploadSession
+- [ ] Обновить core/database.py — создание таблицы
+- [ ] Обновить etl/loader.py — сохранять upload session после загрузки
+- [ ] Обновить api/routers/report.py — читать последний upload session если период не указан
+- [ ] Обновить bot/handlers/commands.py — парсить опциональный параметр /report YYYY-MM
+- [ ] Протестировать автоопределение периода
+- [ ] Закоммитить и запушить изменения

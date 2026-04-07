@@ -44,6 +44,10 @@ class PeriodReport(BaseModel):
     currency: str = "UAH"
     period_type: str = "custom"  # custom, this_month, previous_month
     ai_verdict: Optional[str] = None
+    # Мультивалютные поля
+    currency_breakdown: Optional[Dict[str, Dict[str, Any]]] = None
+    rate: Optional[float] = None
+    rate_type: Optional[str] = None
     
     class Config:
         json_encoders = {

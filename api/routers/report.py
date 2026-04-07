@@ -19,6 +19,8 @@ async def get_period_report(
     to_date: Optional[str] = Query(None, alias="to", description="Конечная дата в формате YYYY-MM-DD (опционально)"),
     currency: Optional[str] = Query(None, description="Фильтр по валюте (например, UAH, USD)"),
     account: Optional[str] = Query(None, description="Фильтр по счёту (например, Payoneer, Моно)"),
+    rate: Optional[float] = Query(None, description="Курс конвертации USD/UAH (только для rate_type='manual')"),
+    rate_type: str = Query("split", description="Тип агрегации: 'split' (раздельный отчёт) или 'manual' (конвертация по курсу)", regex="^(split|manual)$"),
     db: Session = Depends(get_db)
 ) -> PeriodReport:
     """
@@ -29,13 +31,17 @@ async def get_period_report(
     - to: конечная дата (YYYY-MM-DD) - опционально, если не указано, используется период из последнего CSV
     - currency (опционально): фильтр по валюте
     - account (опционально): фильтр по счёту
+    - rate (опционально): курс конвертации USD/UAH (только для rate_type='manual')
+    - rate_type: тип агрегации: 'split' (раздельный отчёт по валютам) или 'manual' (конвертация по курсу)
     
     Примеры:
     - /report/period?from=2026-01-01&to=2026-01-31 (январь 2026)
     - /report/period?from=2026-01-01&to=2026-03-31 (первый квартал)
     - /report/period?from=2026-04-01&to=2026-04-15&currency=USD (первые 2 недели апреля, только USD)
     - /report/period?from=2026-04-01&to=2026-04-30&account=Payoneer (апрель, только счёт Payoneer)
-    - /report/period (автоопределение периода из последнего CSV)
+    - /report/period?rate=41.5&rate_type=manual (конвертация по курсу 41.5 UAH/USD)
+    - /report/period?rate_type=split (раздельный отчёт по валютам)
+    - /report/period (автоопределение периода из последнего CSV, раздельный отчёт)
     """
     try:
         # Автоопределение периода если даты не указаны
@@ -104,12 +110,15 @@ async def get_period_report(
                 month=from_dt,
                 currency=currency or "UAH",
                 period_type="custom",
-                ai_verdict=None
+                ai_verdict=None,
+                currency_breakdown=None,
+                rate=rate,
+                rate_type=rate_type
             )
             return empty_report
         
-        # Строим отчёт
-        report = build_period_report(transactions)
+        # Строим отчёт с мультивалютной агрегацией
+        report = build_period_report(transactions, rate=rate, rate_type=rate_type)
         
         # Читаем стратегию и генерируем AI вердикт
         strategy = read_strategy_file()

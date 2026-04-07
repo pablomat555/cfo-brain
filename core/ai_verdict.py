@@ -25,6 +25,15 @@ def generate_verdict(report: PeriodReport, strategy: str) -> str:
         logger.warning("OPENROUTER_API_KEY not set, returning fallback verdict")
         return "AI analysis unavailable (no API key). Financial report generated successfully."
     
+    # Подготовка промпта с учётом мультивалютной агрегации
+    currency_info = ""
+    if report.rate_type == "manual" and report.rate:
+        currency_info = f"Курс конвертации: $1 = ₴{report.rate} (manual, приблизительно)\n"
+    elif report.rate_type == "split" and report.currency_breakdown:
+        currency_info = "Разбивка по валютам:\n"
+        for curr, data in report.currency_breakdown.items():
+            currency_info += f"- {curr}: доходы {data['total_income']}, расходы {data['total_expenses']}, сбережения {data['net_savings']}\n"
+    
     # Подготовка промпта
     prompt = f"""
 Ты финансовый аналитик. Проанализируй месячный финансовый отчёт и дай рекомендации на основе стратегии.
@@ -35,6 +44,7 @@ def generate_verdict(report: PeriodReport, strategy: str) -> str:
 - Чистые сбережения: {report.net_savings} {report.currency}
 - Норма сбережений: {report.savings_rate:.1f}%
 - Burn rate: {report.burn_rate} {report.currency}
+{currency_info}
 - Топ категорий расходов: {list(report.by_category.items())[:5]}
 - Топ аккаунтов: {list(report.by_account.items())[:3]}
 - Топ-5 расходов: {report.top_expenses[:3] if report.top_expenses else 'нет данных'}

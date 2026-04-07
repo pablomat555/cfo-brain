@@ -7,7 +7,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from core.models import Transaction, UploadSession
-from etl.parser import TransactionRaw
+from etl.parser import TransactionRaw, load_accounts_mapping
 
 
 class LoadResult(BaseModel):
@@ -29,14 +29,40 @@ def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str 
         logger.warning("No rows to load")
         return result
     
+    # Загружаем маппинг аккаунтов на валюты
+    accounts_mapping = load_accounts_mapping()
+    
     for row in rows:
         try:
+            # Определяем валюту на основе маппинга accounts.yml
+            currency = row.currency
+            if row.account:
+                # Ищем точное совпадение
+                if row.account in accounts_mapping:
+                    currency = accounts_mapping[row.account]
+                else:
+                    # Ищем по wildcard (например, "Bybit*")
+                    for pattern, mapped_currency in accounts_mapping.items():
+                        if "*" in pattern:
+                            prefix = pattern.replace("*", "")
+                            if row.account.startswith(prefix):
+                                currency = mapped_currency
+                                break
+                    else:
+                        # Если account не найден в маппинге
+                        currency = "UNKNOWN"
+                        logger.warning(f"Account '{row.account}' not found in accounts mapping, currency set to UNKNOWN")
+            else:
+                # Если account отсутствует
+                currency = "UNKNOWN"
+                logger.warning(f"Transaction has no account, currency set to UNKNOWN")
+            
             # Создаём объект Transaction из TransactionRaw
             transaction = Transaction(
                 date=row.date.date(),  # храним только дату без времени
                 description=row.description,
                 amount=Decimal(str(row.amount)),
-                currency=row.currency,
+                currency=currency,
                 category=row.category,
                 account=row.account,
                 source_file=source_file,

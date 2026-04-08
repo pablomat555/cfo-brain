@@ -27,6 +27,7 @@ services:
       - CFO_DB_URL=${CFO_DB_URL:-sqlite:///./data/cfo.db}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - OWNER_CHAT_ID=${OWNER_CHAT_ID}
     depends_on:
       cfo_api:
         condition: service_healthy

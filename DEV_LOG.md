@@ -1,208 +1,73 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 2026-04-05T20:09:10Z
+Последнее обновление: 2026-04-07T20:01:54Z
 
-## Сессия: Phase 1, Task #3 и #4 — Изменение порта API и добавление команды /report
-**Дата:** 2026-04-05
+## Phase Transition: Phase 1 → Phase 2
+**Дата:** 2026-04-07
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- **Phase 1 (АНАЛИТИК MVP)** завершена: все 7 задач выполнены
+- **Phase 2 (CI/CD & PRODUCTION)** начинается: фокус на deployment и production readiness
+- **Итоги Phase 1:** Полностью работоспособный MVP с ETL pipeline, AI-анализом, Telegram ботом и автоопределением периода
+
+### Выполненные работы в Phase 1
+1. **Task #1** — Scaffold + ETL Pipeline (базовая структура, парсинг CSV, Docker Compose)
+2. **Task #2** — AI вердикт + /report эндпоинт (интеграция OpenRouter, PeriodReport модель)
+3. **Task #3** — Изменение порта API (8001 → 8002)
+4. **Task #4** — Добавление команды /report в боте
+5. **Task #5** — Обновление accounts.yml (13 аккаунтов)
+6. **Task #6** — Автоопределение периода для команды /report (D-13)
+7. **Task #7** — Увеличение timeout в fetch_report до 60 секунд
+
+### Результаты Phase 1
+- ✅ Полная структура repo создана (14+ файлов)
+- ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite
+- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period
+- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report и CSV файлов
+- ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002)
+- ✅ Doppler integration: переменные окружения инжектятся через environment
+- ✅ AI-анализ транзакций через OpenRouter (core/ai_verdict.py)
+- ✅ Автоопределение периода для команды /report (D-13)
+- ✅ Увеличен timeout для fetch_report до 60 секунд
+
+### Выполнено в Phase 2 (сессия 2026-04-08):
+- ✅ D-11 CI/CD — GitHub Actions workflow создан, деплой на VPS работает
+- ✅ D-14 Мультивалютная агрегация — /report с ручным курсом и /skip режимом
+- ✅ D-10 Exception Policy — добавлена в STRATEGY.md
+- ✅ accounts.yml — 13 аккаунтов
+- ✅ venv311 убран из repo
+
+### Следующий шаг:
+- Phase 2 НАБЛЮДАТЕЛЬ — стартует после накопления 2-3 месяцев истории
+
+---
+
+## Сессия: Phase 1, Task #7 — Увеличение timeout в fetch_report до 60 секунд
+**Дата:** 2026-04-07
 **Участники:** Orchestrator, Engineer
 **Статус:** ✅ ЗАВЕРШЕНО
 
 ### Контекст
-- Цель 1: Изменить порт cfo_api с 8001 на 8002 во всех конфигурационных файлах
-- Цель 2: Добавить handler для команды /report в боте, который вызывает API для получения отчёта за текущий месяц
-- Фаза: Phase 1 — АНАЛИТИК (MVP)
-- Задачи: L1 (простая) и L2 (средняя)
+- **Цель:** Увеличить timeout в функции `fetch_report` с 10.0 секунд до 60.0 секунд для предотвращения таймаутов при генерации отчётов
+- **Задача:** L1 (простая) — одна операция, один файл, очевидный scope
+- **Фаза:** Phase 1 — АНАЛИТИК (MVP) (последняя задача перед переходом в Phase 2)
 
 ### Выполненные работы
-1. **Изменение порта cfo_api (Task #3):**
-   - Обновлён `docker-compose.yml`: команда, порты, healthcheck (8001 → 8002)
-   - Обновлён `docker-compose.override.yml`: порты (8001 → 8002)
-   - Обновлён `Makefile`: команда dev-api (--port 8001 → --port 8002)
-   - Обновлён `api/main.py`: порт в блоке `__main__` (8001 → 8002)
-   - Обновлены URL в боте:
-     - `bot/handlers/commands.py`: http://cfo_api:8001/health → http://cfo_api:8002/health
-     - `bot/handlers/csv_upload.py`: http://cfo_api:8001/ingest/csv → http://cfo_api:8002/ingest/csv
-   - Добавлены `venv311/`, `venv/`, `.venv/` в `.gitignore` и удалён `venv311/` из git cache
-   - Выполнен git commit + push
-
-2. **Добавление команды /report (Task #4):**
-   - Добавлен импорт `datetime` и `timedelta` в `bot/handlers/commands.py`
-   - Добавлен handler `cmd_report` с декоратором `@router.message(Command("report"))`
-   - Handler вычисляет даты текущего месяца (первый и последний день)
-   - Выполняет GET запрос к API `http://cfo_api:8002/report/period?from=...&to=...`
-   - Обрабатывает ошибки подключения и HTTP ошибки
-   - Форматирует ответ согласно спецификации:
-     ```
-     📊 Отчёт за [период]
-     
-     💰 Доходы: [total_income]
-     💸 Расходы: [total_expenses]
-     💵 Чистые сбережения: [net_savings]
-     
-     🤖 AI вердикт:
-     (недоступно)
-     ```
-   - Обновлён список команд в `cmd_start` (добавлена строка `/report — финансовый отчёт за текущий месяц`)
-   - Выполнен git commit + push
+1. **Анализ текущего кода:** Найдена функция `fetch_report` в файле [`bot/handlers/commands.py:219`](bot/handlers/commands.py:219)
+2. **Изменение timeout:** В строке 222 изменено `timeout=10.0` на `timeout=60.0`
+3. **Git операции:**
+   - Выполнен git commit с сообщением "fix: increase report timeout to 60s"
+   - Выполнен git push в удалённый репозиторий (origin/main)
 
 ### Технические детали
-- **Вычисление дат месяца:** Используется `datetime.now().date()` и арифметика с `timedelta`
-- **Graceful fallback:** При отсутствии AI вердикта в ответе API выводится заглушка "(недоступно)"
-- **Совместимость:** API endpoint `/report/period` ожидает параметры `from` и `to`, а не `period=this_month`. Handler адаптирован под текущую реализацию API.
-- **Порт 8002:** Все компоненты теперь используют порт 8002 (включая healthcheck и внутренние ссылки)
-
-### Observations outside scope
-- API endpoint `/report/period` не возвращает поле `ai_verdict` в JSON ответе (только логирует). Для полноценной интеграции потребуется доработка модели `PeriodReport`.
-- В файле `.github/workflows/deploy.yml` отсутствует curl команда для проверки health (не требуется для текущей задачи).
+- **Локализация изменения:** Только функция `fetch_report`, другие timeout значения (например, в `cmd_status`) остались без изменений
+- **Причина изменения:** Генерация отчётов с AI-анализом может занимать более 10 секунд, особенно при большом количестве транзакций
+- **Безопасность изменения:** Увеличение timeout не влияет на функциональность, только на максимальное время ожидания ответа от API
 
 ### Результаты
 - **Definition of Done выполнены:** Все чекбоксы TASK.md отмечены
-- **PROJECT_SNAPSHOT.md обновлён:** v0.3-alpha, Task #3 и #4 ЗАВЕРШЁНЫ
-- **Git commits:**
-  - `8af4e45` — "chore: change cfo_api port from 8001 to 8002"
-  - `9b86b73` — "feat: add /report command handler for monthly financial report"
-
----
-
-## Сессия: Phase 1, Task #2 — AI вердикт + /report эндпоинт (исправление D-09)
-**Дата:** 2026-04-04
-**Участники:** Orchestrator, Engineer
-**Статус:** ✅ ЗАВЕРШЕНО
-
-### Контекст
-- Цель: Добавить AI-анализ транзакций через OpenRouter и эндпоинт /report для генерации финансовых отчётов
-- Фаза: Phase 1 — АНАЛИТИК (MVP)
-- Решение D-09: PeriodReport вместо MonthlyReport (реализовано)
-
-### Выполненные работы
-1. **Analytics aggregator** — создан `analytics/aggregator.py` с функцией `build_period_report()`
-2. **AI вердикт** — создан `core/ai_verdict.py` с интеграцией OpenRouter и graceful fallback
-3. **Report эндпоинт** — создан `api/routers/report.py` с эндпоинтом GET `/report/period`
-4. **Модель данных** — обновлён `core/models.py` добавлена модель `PeriodReport` с полем `period_type: str`
-5. **Docker Compose** — обновлён `docker-compose.yml` добавлена переменная OPENROUTER_API_KEY
-6. **STRATEGY.md** — заполнен реальными данными (версия 1.0)
-7. **Переименование согласно D-09** — выполнено полное переименование:
-   - `/report/monthly` → `/report/period`
-   - `MonthlyReport` → `PeriodReport`
-   - `build_monthly_report()` → `build_period_report()`
-   - Обновлены все импорты в зависимых файлах
-
-### Smoke test /report/period
-- **Запрос:** `GET /report/period?from=2026-01-01&to=2026-03-31`
-- **Результат:** HTTP 200 OK
-- **Детали:** Возвращает корректный JSON с полем `period_type` (определяется автоматически как "custom")
-- **AI вердикт:** При отсутствии OPENROUTER_API_KEY возвращает fallback сообщение
-
-### Технические детали
-- **Graceful fallback:** При отсутствии OPENROUTER_API_KEY AI вердикт возвращает строку вместо исключения
-- **Абсолютный путь:** STRATEGY.md читается по пути `/app/STRATEGY.md` согласно D-09
-- **Исключение переводов:** Переводы (`is_transfer=True`) исключены из агрегации
-- **Параметры фильтрации:** Эндпоинт поддерживает фильтры по currency и account
-- **Определение period_type:** Алгоритм в `analytics/aggregator.py` определяет тип периода:
-  - `"this_month"` — все транзакции в текущем месяце
-  - `"previous_month"` — все транзакции в предыдущем месяце
-  - `"custom"` — произвольный диапазон дат
-
-### Observations outside scope
-1. `TELEGRAM_TOKEN` является required полем в `Settings` для запуска API, хотя API не использует Telegram
-2. STRATEGY.md всё ещё содержит placeholder'ы (требуется заполнение реальными данными)
-3. OpenRouter API возвращает 401 при тестовом ключе — ожидаемо, не влияет на функциональность
-
-### Результаты
-- **Definition of Done выполнены:** Все чекбоксы TASK.md отмечены
-- **D-09 записан в DECISION_LOG.md** — решение задокументировано
-- **PROJECT_SNAPSHOT.md обновлён:** v0.2-alpha, Task #2 ЗАВЕРШЁН
-- **Git commit:** Зафиксированы все изменения (13 файлов)
-
----
-
-## Сессия: Phase 1, Task #1 — Scaffold + ETL Pipeline
-**Дата:** 2026-04-03
-**Участники:** Orchestrator, Engineer
-**Статус:** ✅ ЗАВЕРШЕНО
-
-### Контекст
-- Цель: Создать структуру repo для CFO Brain с dev/prod разделением
-- Стек: Python + FastAPI + aiogram 3.x + SQLite + Docker Compose + Doppler
-- Фаза: Phase 1 — АНАЛИТИК (MVP)
-
-### Выполненные работы
-1. **Структура repo** — созданы все 14+ файлов согласно TASK.md
-2. **Core модули** — config.py, models.py, database.py с SQLAlchemy
-3. **ETL Pipeline** — parser.py с обработкой non-breaking spaces, loader.py с unique constraint
-4. **API** — FastAPI с эндпоинтами /ingest/csv и /health
-5. **Bot** — aiogram 3.x с обработкой команд /start, /status и CSV файлов
-6. **Docker Compose** — два сервиса (cfo_api, cfo_bot) с healthcheck
-7. **Doppler integration** — переменные окружения инжектятся через environment
-8. **Makefile** — команды make dev-api, make up, make logs
-9. **Конфигурация** — accounts.yml для маппинга аккаунтов на валюты
-10. **Git инициализация** — репозиторий создан, все файлы закоммичены
-
-### Технические детали
-- **Unique constraint:** `(date, amount, account, description)` для предотвращения дублей
-- **Amount parsing:** Обработка non-breaking space (`\u00a0`) в европейских CSV
-- **Currency mapping:** Human-editable YAML файл для добавления новых аккаунтов
-- **aiogram 3.x migration:** Полный переход с v2 на v3 (Router pattern, F filters)
-- **Doppler compatibility:** Убраны `version` и `env_file` из compose файлов
-
-### Решенные проблемы
-1. **ModuleNotFoundError: aiogram.contrib** — миграция на aiogram.fsm.storage.memory
-2. **ImportError: ContentTypesFilter** — замена на F.document фильтр
-3. **TypeError: Dispatcher constructor** — исправлен вызов Dispatcher(storage=storage)
-4. **TokenValidationError** — удален dummy token из docker-compose.override.yml
-5. **Healthcheck failed** — заменен curl на Python-based healthcheck
-6. **Unclosed connector warning** — некритичное предупреждение aiohttp
-
-### Результаты тестирования
-- ✅ `make dev-api` — API поднимается локально
-- ✅ `POST /ingest/csv` — принимает CSV, возвращает статистику (4/8 строк загружено, 2 перевода, 2 дубля)
-- ✅ `make up` — оба сервиса healthy в Docker Compose
-- ✅ Бот запускается — "CFO Brain bot started" в логах
-- ✅ Doppler переменные инжектятся корректно
-
-### Observations outside scope (для Task #2)
-1. **Unclosed connector warning** — aiohttp сессия не закрывается корректно при старте
-2. **Нет AI-анализа** — требуется интеграция с OpenRouter для генерации вердиктов
-3. **Нет эндпоинта /report** — нужен для генерации отчётов по транзакциям
-4. **Нет категоризации** — транзакции не группируются по категориям
-
-### Следующие шаги
-1. **Task #2** — AI вердикт + /report эндпоинт
-2. **Git commit** — зафиксировать текущее состояние
-3. **Deploy** — развернуть на VPS через GitHub Actions
-
-### Lessons Learned
-- **Doppler integration:** Использовать `environment` секцию вместо `env_file`
-- **aiogram 3.x:** Router pattern более чистый чем register_message_handler
-- **Non-breaking spaces:** Европейские банки используют `\u00a0` как разделитель тысяч
-- **Unique constraint:** Нужно включать description для предотвращения ложных дублей
-
----
-
-## Сессия: Заполнение STRATEGY.md реальными данными
-**Дата:** 2026-04-04
-**Участники:** Orchestrator, Engineer
-**Статус:** ✅ ЗАВЕРШЕНО
-
-### Контекст
-- Цель: Заполнить STRATEGY.md реальными данными (замена placeholder'ов на конкретные значения)
-- Задача: L1 (простая) - одна операция, один файл, очевидный scope
-- Фаза: Phase 1 — подготовка к Task #2 (AI вердикт + /report эндпоинт)
-
-### Выполненные работы
-1. **STRATEGY.md заполнен реальными данными** — версия 1.0
-2. **Аллокация капитала:** Кэш 20%, ETF 60%, крипто 15%, прочее 5%
-3. **Лимиты расходов:** Burn Rate $2000/мес, Emergency fund 6 мес
-4. **Категории расходов:** Еда $500, Транспорт $200, Развлечения $300, Инвестиции мин $1000
-5. **Стратегия роста:** Оборонительный рост, горизонт 5 лет
-6. **Цели:** 2026 — savings rate 30%, 2027 — emergency fund 6 мес
-
-### Результаты
-- STRATEGY.md готов к использованию в AI-анализе и отчётах
-- Все placeholder'ы заменены на конкретные значения
-- Файл интегрирован в систему (читается по пути `/app/STRATEGY.md`)
-
-### Связь с Task #2
-Заполнение STRATEGY.md было предварительным шагом для Task #2, где AI вердикт использует эти данные для сравнения с фактическими транзакциями.
+- **PROJECT_SNAPSHOT.md обновлён:** Добавлена Task #7, версия v0.6-alpha
+- **Git commit:** Зафиксировано изменение timeout
 
 ---
 
@@ -215,54 +80,48 @@
 - **Цель:** Реализовать автоопределение периода для команды `/report` на основе дат последнего загруженного CSV файла
 - **Задача:** L2 (средняя) — несколько файлов, зависимости между компонентами
 - **Фаза:** Phase 1 — АНАЛИТИК (MVP)
-- **Требования D-13:**
-  1. После успешного `/ingest/csv` — сохранять в БД метаданные последней загрузки: min_date и max_date из распарсенных транзакций
-  2. `/report` без параметров — берёт этот период
-  3. `/report 2026-03` — явное указание месяца (парсить как YYYY-MM)
-  4. Если метаданных нет — fallback на текущий месяц
 
 ### Выполненные работы
-1. **Добавлена модель UploadSession в [`core/models.py`](core/models.py):**
-   - Поля: id, uploaded_at, min_date, max_date, transactions_count
-   - Таблица создаётся автоматически через Base.metadata.create_all()
-
-2. **Обновлён [`etl/loader.py`](etl/loader.py) для сохранения upload session:**
-   - После успешной загрузки транзакций вычисляются min_date и max_date
-   - Создаётся запись UploadSession с метаданными
-   - Сохраняется в БД через ту же сессию
-
-3. **Обновлён [`api/routers/report.py`](api/routers/report.py) для автоопределения периода:**
-   - Параметры `from_date` и `to_date` стали опциональными
-   - Если даты не указаны: получает последний UploadSession из БД
-   - Если UploadSession существует: использует его min_date и max_date
-   - Если нет: fallback на текущий месяц
-
-4. **Обновлён [`bot/handlers/commands.py`](bot/handlers/commands.py) для поддержки параметра:**
-   - Команда `/report` теперь принимает опциональный параметр YYYY-MM
-   - Без параметра: вызывает API без дат (автоопределение)
-   - С параметром: вычисляет даты указанного месяца и передаёт в API
-   - Обновлена документация в команде `/start`
-
-5. **Протестирована функциональность:**
-   - Проверен синтаксис всех изменённых файлов
-   - Логика автоопределения периода корректна
-
-6. **Закоммичены и запушены изменения:**
-   - Коммит e506021: "feat: add auto-period detection for /report command (D-13)"
-   - Изменения запушены в удалённый репозиторий
-
-### Технические детали
-- **Автоопределение периода:** Система запоминает даты последнего CSV и использует их при вызове `/report` без параметров
-- **Fallback механизм:** Если upload session не существует, используется текущий месяц
-- **Обратная совместимость:** Существующие вызовы API с явными датами продолжают работать
-- **Парсинг параметра:** Команда `/report 2026-03` корректно парсится как март 2026 года
+1. **Добавлена модель UploadSession** в [`core/models.py`](core/models.py)
+2. **Обновлён [`etl/loader.py`](etl/loader.py)** для сохранения upload session после загрузки CSV
+3. **Обновлён [`api/routers/report.py`](api/routers/report.py)** для автоопределения периода
+4. **Обновлён [`bot/handlers/commands.py`](bot/handlers/commands.py)** для поддержки параметра `/report YYYY-MM`
+5. **Протестирована функциональность** и закоммичены изменения
 
 ### Результаты
 - Команда `/report` теперь поддерживает автоопределение периода из последнего CSV
 - Пользователь может явно указать месяц: `/report YYYY-MM`
-- Система стала более удобной — не нужно каждый раз указывать даты
 - Все изменения соответствуют требованиям D-13
 
 ---
 
-**Следующая сессия:** Развертывание Phase 1 в production и E2E валидация
+## Сессия: Phase 2, Task D-10 — Добавление Exception Policy в STRATEGY.md
+**Дата:** 2026-04-08
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- **Цель:** Добавить блок "Exception Policy" в конец файла STRATEGY.md согласно спецификации D-10
+- **Задача:** L1 (простая) — документационное изменение, один файл, очевидный scope
+- **Фаза:** Phase 2 — CI/CD & PRODUCTION
+
+### Выполненные работы
+1. **Анализ текущего файла:** Прочитан STRATEGY.md, определён конец файла (после секции "## 5. STRATEGIC GOALS (2026)")
+2. **Добавление блока:** В конец файла добавлен новый блок "Exception Policy" с описанием трёх типов расходов и лимитов
+3. **Обновление документации:** Обновлены DEV_LOG.md и PROJECT_SNAPSHOT.md
+4. **Git операции:** Выполнены git add, commit и push
+
+### Технические детали
+- **Локализация изменения:** Только файл STRATEGY.md, добавление новой секции без изменения существующего содержания
+- **Содержание блока:** Определяет три типа расходов (routine, strategic, exceptional) и лимиты для exceptional расходов
+- **Причина изменения:** Реализация решения D-10 для формализации политики обработки исключительных расходов
+
+### Результаты
+- **Definition of Done выполнены:** Все чекбоксы TASK.md отмечены
+- **PROJECT_SNAPSHOT.md обновлён:** D-10 удалён из списка "Открытые решения"
+
+---
+
+*Примечание: Полная история Phase 1 доступна в архиве docs/logs/DEV_LOG_Phase1.md (создан при rollover)*
+
+**Следующая сессия:** Phase 2 НАБЛЮДАТЕЛЬ — старт после накопления истории транзакций

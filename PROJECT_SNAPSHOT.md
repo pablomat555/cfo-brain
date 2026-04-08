@@ -89,4 +89,5 @@
 - ⚠️ Двойной commit в etl/loader.py
 
 ### Открытые решения (не блокируют Phase 2):
-- python3 стандарт — добавить в CLAUDE.md
+- D-10 Exception Policy — ✅ выполнено (добавлено в STRATEGY.md)
+- python3 стандарт — ✅ выполнено (добавлено в CLAUDE.md)

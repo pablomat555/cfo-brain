@@ -1,53 +1,171 @@
-# TASK: Update PROJECT_SNAPSHOT.md — обновить секцию "Следующий шаг"
+# TASK: Phase 2, Task #4 — Integration Smoke Test
 
-**Создан:** 2026-04-07T20:10:08Z
-**Уровень:** L1
+**Создан:** 08 апреля 2026, 21:00 (Kyiv)
+**Уровень:** L2
 **Статус:** pending
 
 ## Цель
-Обновить секцию "Следующий шаг" в файле [`PROJECT_SNAPSHOT.md`](PROJECT_SNAPSHOT.md) с содержанием, предоставленным пользователем.
+Выполнить живые проверки на VPS по чеклисту из 7 пунктов, убедиться что Phase 2 работает в production как задумано.
 
 ## Scope
 Файлы и директории в scope:
-- [`PROJECT_SNAPSHOT.md`](PROJECT_SNAPSHOT.md)
+- Нет (только проверки на работающей системе)
 
 Вне scope (не трогать):
-- все остальные файлы
-- другие секции PROJECT_SNAPSHOT.md
-- изменения в архитектуре или логике
+- Все файлы кода (никаких изменений)
+- Исправление найденных багов
+- Написание автотестов
+
+---
 
 ## Шаги
-1. Открыть файл [`PROJECT_SNAPSHOT.md`](PROJECT_SNAPSHOT.md)
-2. Найти секцию "Следующий шаг" (строка 77)
-3. Заменить текущее содержание секции (строки 77-94) на новое содержание:
+1. Проверить что контейнеры запущены (`make up`, `make logs`)
+2. Выполнить проверку 1: Scheduler стартовал
+3. Выполнить проверку 2: GET /health
+4. Выполнить проверку 3: GET /observer/anomalies
+5. Выполнить проверку 4: GET /observer/trends
+6. Выполнить проверку 5: Команды /anomalies и /trends в боте
+7. Выполнить проверку 6: Ingest CSV + bounded polling
+8. Выполнить проверку 7: Принудительный запуск weekly_digest
+9. Составить отчёт по формату (✅ PASS / ⚠️ PARTIAL / ❌ FAIL)
+10. Если есть ❌ FAIL — не закрывать задачу, сообщить архитектору
+
+---
+
+## Предусловия
+
+Перед началом убедиться:
+- `make up` на VPS прошёл без ошибок
+- `make logs` показывает оба контейнера (cfo_api, cfo_bot) запущены
+- Doppler: `OWNER_CHAT_ID` установлен
+
+---
+
+## Чеклист проверок
+
+### 1. Scheduler стартовал
+
+```bash
+make logs | grep -i "scheduler\|APScheduler\|weekly_digest\|job"
 ```
-## Следующий шаг
-**Phase 2 — НАБЛЮДАТЕЛЬ (не стартовать до накопления 2-3 месяцев истории)**
 
-### Что выполнено сверх Phase 1 DoD:
-- ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический
-- ✅ D-13 — автоопределение периода из последнего CSV
-- ✅ D-14 — мультивалютная агрегация (ручной курс + /skip режим)
-- ✅ accounts.yml — 13 аккаунтов с валютами
-- ✅ venv311 убран из repo
+Ожидаемый результат: строка вида
+`Scheduler started` или `Added job weekly_digest`
 
-### Known Issues (некритично):
-- ⚠️ Unclosed connector warning в боте (aiohttp cleanup)
-- ⚠️ Двойной commit в etl/loader.py
+Если пусто → scheduler не стартовал, остановиться и сообщить.
 
-### Открытые решения (не блокируют Phase 2):
-- D-10 Exception Policy — добавить в STRATEGY.md
-- python3 стандарт — добавить в CLAUDE.md
+---
+
+### 2. GET /health
+
+```bash
+curl http://localhost:8002/health
 ```
-4. Сохранить изменения
-5. Выполнить git add PROJECT_SNAPSHOT.md
-6. Выполнить git commit с сообщением "docs: update PROJECT_SNAPSHOT with Phase 2 next steps"
-7. Выполнить git push
+
+Ожидаемый результат: `{"status": "ok"}`
+
+---
+
+### 3. GET /observer/anomalies — базовый ответ
+
+```bash
+curl "http://localhost:8002/observer/anomalies"
+```
+
+Ожидаемый результат: валидный JSON с полем `detection_status`.
+Значение `"insufficient_history"` или `"ok"` — оба корректны на этом этапе.
+Значение `"pending"` — допустимо если observer ещё не завершил scan.
+Ошибка 500 → остановиться и сообщить.
+
+---
+
+### 4. GET /observer/trends — базовый ответ
+
+```bash
+curl "http://localhost:8002/observer/trends?months=3"
+```
+
+Ожидаемый результат: валидный JSON с полями `period` и `metrics`.
+Пустой `metrics: []` допустим если истории нет.
+Ошибка 500 → остановиться и сообщить.
+
+---
+
+### 5. Команды в боте
+
+В Telegram отправить боту:
+- `/anomalies` → бот отвечает (любой ответ кроме timeout/ошибки)
+- `/trends` → бот отвечает (любой ответ кроме timeout/ошибки)
+
+---
+
+### 6. Ingest CSV + bounded polling
+
+Отправить боту реальный CSV файл.
+
+Проверить последовательность в логах:
+```bash
+make logs | grep -i "ingest\|observer\|polling\|anomaly\|pending"
+```
+
+Ожидаемая последовательность:
+1. `ETL completed` (или аналог)
+2. `create_task` / observer запущен
+3. Polling попытки (1-3)
+4. Либо `anomaly alert sent` либо тихое завершение
+
+Если polling не виден в логах → сообщить как Observation.
+
+---
+
+### 7. Принудительный запуск weekly_digest
+
+Одноразовый вызов функции дайджеста напрямую через Python:
+
+```bash
+docker exec cfo_bot python3 -c "
+import asyncio
+from bot.scheduler import weekly_digest
+from bot.main import bot
+import os
+chat_id = int(os.getenv('OWNER_CHAT_ID'))
+asyncio.run(weekly_digest(bot, chat_id))
+"
+```
+
+Ожидаемый результат: сообщение пришло в Telegram.
+Проверить: формат читаемый, нет traceback в логах.
+
+---
 
 ## Definition of Done
-- [ ] Секция "Следующий шаг" обновлена с новым содержанием
-- [ ] Изменения закоммичены в git
-- [ ] Изменения запушены в удалённый репозиторий
+
+- [ ] Scheduler стартовал, job `weekly_digest` виден в логах
+- [ ] GET /health возвращает 200
+- [ ] GET /observer/anomalies возвращает валидный JSON
+- [ ] GET /observer/trends возвращает валидный JSON
+- [ ] /anomalies и /trends в боте отвечают без ошибок
+- [ ] После ingest CSV observer отрабатывает (виден в логах)
+- [ ] weekly_digest доставлен в Telegram принудительным вызовом
+
+---
+
+## Формат отчёта
+
+Для каждой проверки указать:
+- ✅ PASS — работает как ожидалось
+- ⚠️ PARTIAL — работает но есть отклонение (описать)
+- ❌ FAIL — не работает (приложить лог)
+
+Если есть ❌ FAIL → не закрывать задачу, сообщить архитектору.
+
+---
+
+## Out of Scope
+
+- Написание автотестов (pytest) — отдельная задача если понадобится
+- Исправление найденных багов в рамках этой задачи — только фиксация
+- Изменения в коде любого рода
 
 ## Observations outside scope
-(Engineer заполняет в конце - наблюдения вне scope, не применённые)
+*(Engineer заполняет в конце — наблюдения вне scope, не применённые)*

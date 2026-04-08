@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 2026-04-07T20:06:19Z
+Последнее обновление: 08 апреля 2026, 20:33 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -28,10 +28,11 @@
   - `CFO_DB_URL` (по умолчанию sqlite:///./data/cfo.db)
   - `OPENROUTER_API_KEY` (для AI-анализа, опционально)
   - `LOG_LEVEL` (по умолчанию INFO)
+  - `OWNER_CHAT_ID` (для еженедельного дайджеста)
 
 ## 4. Текущее состояние
 - **Версия:** v0.6-alpha
-- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 активна
+- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН
   - Phase 1, Task #1 ЗАВЕРШЁН (базовая структура)
   - Phase 1, Task #2 ЗАВЕРШЁН (AI вердикт + /report эндпоинт)
   - Phase 1, Task #3 ЗАВЕРШЁН (port change 8001 → 8002)
@@ -39,6 +40,9 @@
   - Phase 1, Task #5 ЗАВЕРШЁН (accounts.yml update)
   - Phase 1, Task #6 ЗАВЕРШЁН (D-13 auto-period detection)
   - Phase 1, Task #7 ЗАВЕРШЁН (timeout fix 10s → 60s)
+  - Phase 2, Task #1 ЗАВЕРШЁН (Observer Foundation — data layer)
+  - Phase 2, Task #2 ЗАВЕРШЁН (Observer API + Bot Surface)
+  - Phase 2, Task #3 ЗАВЕРШЁН (Scheduler + Post-Ingest Alert)
 
 ### Что работает
 - ✅ Полная структура repo создана (14+ файлов)
@@ -59,23 +63,26 @@
 - ✅ Автоопределение периода для команды /report (D-13): система запоминает даты последнего CSV и использует их при вызове /report без параметров
 - ✅ Поддержка параметра /report YYYY-MM для явного указания месяца
 - ✅ Увеличен timeout для fetch_report до 60 секунд (предотвращение таймаутов при генерации отчётов)
+- ✅ Observer Foundation: таблицы monthly_metrics, category_metrics, anomaly_events (D-16)
+- ✅ metrics_service.recalculate() + anomaly_service.scan() с post-ingest hook (D-21)
+- ✅ GET /observer/anomalies — аномалии за период с detection_status (D-19)
+- ✅ GET /observer/trends — метрики по месяцам, ASC, с rate_type (D-19)
+- ✅ Команды /anomalies и /trends в боте
+- ✅ APScheduler: еженедельный дайджест (пн 09:00 Europe/Kyiv)
+- ✅ Post-ingest alert: bounded polling D-23 (3 попытки, 2с интервал)
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
 - ⚠️ Двойной commit в etl/loader.py (один для upload session, другой для транзакций) — может быть оптимизировано
+- ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
 
 ## 5. Фокус сессии
-- **Цель:** Завершение Phase 2 — настройка CI/CD и production deployment
-- **Last Commit:** [hash] — "fix: increase report timeout to 60s" (2026-04-07)
-- **Git Status:** Все изменения закоммичены и запушены. Остался нескоммиченный архивный файл docs/tasks/TASK_2026-04-07_ai-verdict-fix.md
-
-### Definition of Done (Phase 1, Task #7 — timeout fix)
-- [x] Timeout изменён с 10.0 на 60.0 в функции fetch_report (bot/handlers/commands.py:222)
-- [x] Изменения закоммичены в git
-- [x] Изменения запушены в удалённый репозиторий
+- **Цель:** Phase 2 завершена. Система в production, накапливает историю.
+- **Last Commit:** Phase 2, Task #3 — Scheduler + Post-Ingest Alert
+- **Git Status:** Все изменения закоммичены и запушены.
 
 ## Следующий шаг
-**Phase 2 — НАБЛЮДАТЕЛЬ (не стартовать до накопления 2-3 месяцев истории)**
+**Phase 2 ЗАВЕРШЁН.** Следующий шаг — накопить 2-3 месяца истории, затем Phase 3 (СТРАТЕГ).
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический
@@ -83,11 +90,11 @@
 - ✅ D-14 — мультивалютная агрегация (ручной курс + /skip режим)
 - ✅ accounts.yml — 13 аккаунтов с валютами
 - ✅ venv311 убран из repo
+- ✅ Phase 2, Task #1 — Observer Foundation (data layer, три таблицы метрик, сервисы пересчёта и детекции, post-ingest hook)
+- ✅ Phase 2, Task #2 — Observer API + Bot Surface (GET /observer/anomalies, GET /observer/trends, команды /anomalies и /trends в боте)
+- ✅ Phase 2, Task #3 — Scheduler + Post-Ingest Alert (APScheduler, bounded polling, исправление D-22)
 
-### Known Issues (некритично):
-- ⚠️ Unclosed connector warning в боте (aiohttp cleanup)
-- ⚠️ Двойной commit в etl/loader.py
-
-### Открытые решения (не блокируют Phase 2):
+### Открытые решения (не блокируют Phase 3):
 - D-10 Exception Policy — ✅ выполнено (добавлено в STRATEGY.md)
 - python3 стандарт — ✅ выполнено (добавлено в CLAUDE.md)
+- D-22 get_last_complete_month() — ✅ закрыто в Task #3

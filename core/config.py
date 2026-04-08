@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     telegram_token: str
     db_url: str = "sqlite:///./cfo.db"
     openrouter_api_key: str | None = None
+    owner_chat_id: int | None = None  # для еженедельного дайджеста
 
     class Config:
         env_file = ".env"

@@ -15,6 +15,7 @@ class LoadResult(BaseModel):
     inserted: int = 0
     skipped_duplicates: int = 0
     errors: int = 0
+    detection_status: str = "pending"  # 'pending' | 'running' | 'completed' | 'error' | 'skip_mode'
 
 
 def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str = "unknown.csv") -> LoadResult:

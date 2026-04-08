@@ -1,7 +1,12 @@
 # CLAUDE.md — Agent Contract
 # CFO Brain
 
-Всегда отвечай на русском языке.
+Всегда отвечай на русском языке!!!!
+
+## Формат дат
+- Всегда использовать читаемый формат: `08 апреля 2026, 20:33 (Kyiv)`
+- Никогда не использовать ISO 8601 с суффиксом Z (UTC) — только Kyiv timezone
+- Применяется везде: PROJECT_SNAPSHOT.md, DEV_LOG.md, TASK.md, DECISION_LOG.md
 
 ## Правила
 - Читай PROJECT_SNAPSHOT.md и TASK.md перед любым действием
@@ -37,7 +42,9 @@ Vault (Obsidian) — только через MCP → /save.
 - Schemas: `pydantic` для всех моделей данных
 - Paths: `pathlib.Path`
 - Error handling: `try/except` на всех I/O, network, subprocess
-
+## Python
+- Всегда использовать `python3` (не `python`)
+- Не проверять версию Python перед выполнением команд
 ## Stack Rules — Docker / DevOps
 - Images: pinned versions, никогда `latest` в production
 - Secrets: никогда в Dockerfile или docker-compose.yml

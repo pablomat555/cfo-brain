@@ -12,6 +12,8 @@ from loguru import logger
 from core.config import get_settings
 from bot.handlers.csv_upload import router as csv_router
 from bot.handlers.commands import router as commands_router
+from bot.handlers.observer import router as observer_router
+from bot.scheduler import setup_scheduler
 
 
 async def main():
@@ -37,6 +39,15 @@ async def main():
     # Регистрация роутеров
     dp.include_router(commands_router)
     dp.include_router(csv_router)
+    dp.include_router(observer_router)
+    
+    # Запуск scheduler для еженедельного дайджеста
+    if settings.owner_chat_id:
+        scheduler = setup_scheduler(bot, settings.owner_chat_id)
+        scheduler.start()
+        logger.info(f"Scheduler started for chat_id={settings.owner_chat_id}")
+    else:
+        logger.warning("OWNER_CHAT_ID not set, scheduler disabled")
     
     logger.info("CFO Brain bot started")
     

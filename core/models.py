@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Any, Optional
-from sqlalchemy import Column, Integer, Date, String, DateTime, Numeric, UniqueConstraint
+from sqlalchemy import Column, Integer, Date, String, DateTime, Numeric, UniqueConstraint, Float
 from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel
 
@@ -68,3 +68,109 @@ class UploadSession(Base):
     def __repr__(self):
         return f"<UploadSession(id={self.id}, uploaded_at={self.uploaded_at}, " \
                f"min_date={self.min_date}, max_date={self.max_date}, count={self.transactions_count})>"
+
+
+# Observer Foundation Models (НАБЛЮДАТЕЛЬ)
+
+class MonthlyMetrics(Base):
+    """SQLAlchemy модель для таблицы monthly_metrics"""
+    __tablename__ = "monthly_metrics"
+
+    id = Column(Integer, primary_key=True)
+    month_key = Column(String, nullable=False, unique=True)  # 'YYYY-MM'
+    total_spent = Column(Float, nullable=False)  # всегда в USD
+    total_income = Column(Float, nullable=False)  # всегда в USD
+    savings_rate = Column(Float, nullable=False)  # (income - spent) / income
+    burn_rate = Column(Float, nullable=False)  # total_spent в USD (по курсу ingest)
+    currency = Column(String, nullable=False, default="USD")  # всегда 'USD'; 'multi' запрещён
+    fx_rate = Column(Float, nullable=False)  # курс UAH/USD применённый при ingest (0.0 если /skip)
+    rate_type = Column(String, nullable=False)  # 'manual' | 'skip'
+    tx_count = Column(Integer, nullable=False)
+    updated_at = Column(String, nullable=False)  # ISO datetime последнего пересчёта
+
+    def __repr__(self):
+        return f"<MonthlyMetrics(month_key={self.month_key}, total_spent={self.total_spent}, " \
+               f"total_income={self.total_income}, savings_rate={self.savings_rate}%)>"
+
+
+class CategoryMetrics(Base):
+    """SQLAlchemy модель для таблицы category_metrics"""
+    __tablename__ = "category_metrics"
+
+    id = Column(Integer, primary_key=True)
+    month_key = Column(String, nullable=False)  # FK → monthly_metrics.month_key
+    category = Column(String, nullable=False)
+    total = Column(Float, nullable=False)  # в USD (конвертировано по fx_rate месяца)
+    tx_count = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("month_key", "category", name="uq_category_metrics"),
+    )
+
+    def __repr__(self):
+        return f"<CategoryMetrics(month_key={self.month_key}, category={self.category}, " \
+               f"total={self.total}, tx_count={self.tx_count})>"
+
+
+class AnomalyEvent(Base):
+    """SQLAlchemy модель для таблицы anomaly_events"""
+    __tablename__ = "anomaly_events"
+
+    id = Column(Integer, primary_key=True)
+    month_key = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    current_val = Column(Float, nullable=False)  # в USD
+    baseline_val = Column(Float, nullable=False)  # среднее за 3 предыдущих месяца, в USD
+    delta_pct = Column(Float, nullable=False)  # (current - baseline) / baseline * 100
+    threshold = Column(Float, nullable=False)  # порог срабатывания (default: 50%)
+    status = Column(String, nullable=False)  # 'new' | 'notified' | 'dismissed'
+    detected_at = Column(String, nullable=False)  # ISO datetime обнаружения
+
+    def __repr__(self):
+        return f"<AnomalyEvent(month_key={self.month_key}, category={self.category}, " \
+               f"delta_pct={self.delta_pct}%, status={self.status})>"
+
+
+# Pydantic модели для API responses
+
+class MonthlyMetricsResponse(BaseModel):
+    """Pydantic модель для ответа API с monthly_metrics"""
+    month_key: str
+    total_spent: float
+    total_income: float
+    savings_rate: float
+    burn_rate: float
+    currency: str = "USD"
+    fx_rate: float
+    rate_type: str
+    tx_count: int
+    updated_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryMetricsResponse(BaseModel):
+    """Pydantic модель для ответа API с category_metrics"""
+    month_key: str
+    category: str
+    total: float
+    tx_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class AnomalyEventResponse(BaseModel):
+    """Pydantic модель для ответа API с anomaly_events"""
+    month_key: str
+    category: str
+    current_val: float
+    baseline_val: float
+    delta_pct: float
+    threshold: float
+    status: str
+    detected_at: str
+
+    class Config:
+        from_attributes = True

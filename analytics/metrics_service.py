@@ -2,7 +2,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Dict, List, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, text
 from loguru import logger
 
 from core.models import Transaction, UploadSession
@@ -113,11 +113,11 @@ def recalculate(month_key: str) -> None:
         
         # Upsert monthly_metrics
         db.execute(
-            """
-            INSERT OR REPLACE INTO monthly_metrics 
+            text("""
+            INSERT OR REPLACE INTO monthly_metrics
             (month_key, total_spent, total_income, savings_rate, burn_rate, currency, fx_rate, rate_type, tx_count, updated_at)
             VALUES (:month_key, :total_spent, :total_income, :savings_rate, :burn_rate, :currency, :fx_rate, :rate_type, :tx_count, :updated_at)
-            """,
+            """),
             {
                 "month_key": month_key,
                 "total_spent": total_spent,
@@ -135,11 +135,11 @@ def recalculate(month_key: str) -> None:
         # Upsert category_metrics
         for category, total in category_totals.items():
             db.execute(
-                """
-                INSERT OR REPLACE INTO category_metrics 
+                text("""
+                INSERT OR REPLACE INTO category_metrics
                 (month_key, category, total, tx_count)
                 VALUES (:month_key, :category, :total, :tx_count)
-                """,
+                """),
                 {
                     "month_key": month_key,
                     "category": category,

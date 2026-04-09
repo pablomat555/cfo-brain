@@ -5,7 +5,7 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     telegram_token: str
-    db_url: str = Field(default="sqlite:///./cfo.db", env="CFO_DB_URL")
+    cfo_db_url: str = "sqlite:////app/data/cfo.db"
     openrouter_api_key: str | None = None
     owner_chat_id: int | None = None  # для еженедельного дайджеста
 

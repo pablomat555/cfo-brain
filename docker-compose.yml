@@ -4,7 +4,7 @@ services:
     command: uvicorn api.main:app --host 0.0.0.0 --port 8002
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - CFO_DB_URL=${CFO_DB_URL:-sqlite:///./data/cfo.db}
+      - CFO_DB_URL=${CFO_DB_URL:-sqlite:////app/data/cfo.db}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
@@ -24,7 +24,7 @@ services:
     command: python -m bot.main
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - CFO_DB_URL=${CFO_DB_URL:-sqlite:///./data/cfo.db}
+      - CFO_DB_URL=${CFO_DB_URL:-sqlite:////app/data/cfo.db}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - OWNER_CHAT_ID=${OWNER_CHAT_ID}

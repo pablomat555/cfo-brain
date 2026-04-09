@@ -8,7 +8,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
-      - ./data:/app/data
+      - cfo_data:/app/data
       - ./accounts.yml:/app/accounts.yml:ro
     ports:
       - "8002:8002"
@@ -34,3 +34,6 @@ services:
     volumes:
       - ./accounts.yml:/app/accounts.yml:ro
     restart: unless-stopped
+
+volumes:
+  cfo_data:

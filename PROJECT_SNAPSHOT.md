@@ -1,12 +1,12 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 10 апреля 2026, 21:04 (Kyiv)
+Последнее обновление: 10 апреля 2026, 21:56 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
 - **Owner:** Я
 - **Repo:** git@github.com:pablomat555/cfo-brain.git
 - **Стек:** Python · aiogram 3.x · FastAPI · SQLite · Docker Compose · Doppler
-- **Текущая фаза:** Phase 2 — CI/CD & PRODUCTION
+- **Текущая фаза:** Phase 3 — СТРАТЕГ
 
 ## 2. Архитектура
 - **Flow:** Telegram → Bot Gateway → CFO Brain API → ETL Pipeline → SQLite → Response
@@ -31,8 +31,8 @@
   - `OWNER_CHAT_ID` (для еженедельного дайджеста)
 
 ## 4. Текущее состояние
-- **Версия:** v0.8-alpha
-- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 ГОТОВ К СТАРТУ
+- **Версия:** v0.9-alpha
+- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 АКТИВНА
   - Phase 1, Task #1 ЗАВЕРШЁН (базовая структура)
   - Phase 1, Task #2 ЗАВЕРШЁН (AI вердикт + /report эндпоинт)
   - Phase 1, Task #3 ЗАВЕРШЁН (port change 8001 → 8002)
@@ -45,16 +45,22 @@
   - Phase 2, Task #3 ЗАВЕРШЁН (Scheduler + Post-Ingest Alert)
   - Phase 2, Task #4 ✅ ЗАВЕРШЁН (Integration Smoke Test — после исправления OWNER_CHAT_ID все проверки PASS)
   - Phase 2, Task #5 ✅ ЗАВЕРШЁН (Fix OWNER_CHAT_ID Propagation — добавлен в docker-compose.yml)
+  - Phase 2, Task #6 ✅ ЗАВЕРШЁН (Backfill Historical Metrics)
+  - Phase 2, Task #7 ✅ ЗАВЕРШЁН (Persistent SQLite Volume)
+  - Phase 2, Task #8 ✅ ЗАВЕРШЁН (Fix ETL Rollback Bug)
+  - Phase 2, Task #9 ✅ ЗАВЕРШЁН (Filter Balancing Transactions and Internal Transfers)
   - **Дополнительные задачи Phase 2:**
     - ✅ **Volume persistence** — добавлен named volume `cfo_data` для `/app/data`
     - ✅ **Конфигурация CFO_DB_URL** — исправлено поле `cfo_db_url` для использования env переменной
     - ✅ **Backfill скрипт** — создан `scripts/backfill_metrics.py` для обработки отсутствующих месяцев
     - ✅ **Фикс rollback бага** — исправлен деструктивный паттерн в `etl/loader.py` через `db.begin_nested()`
     - ✅ **Валидатор OWNER_CHAT_ID** — добавлен validator для преобразования пустой строки в None
+    - ✅ **Фильтрация технических записей** — добавлена фильтрация Balancing transaction и переводов между счетами
 
 ### Что работает
 - ✅ Полная структура repo создана (20+ файлов)
 - ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite с isolated transactions через `db.begin_nested()`
+- ✅ Фильтрация: Balancing transaction и переводы между счетами пропускаются
 - ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period, GET /observer/anomalies, GET /observer/trends
 - ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends и CSV файлов
 - ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002) и named volume `cfo_data`
@@ -84,6 +90,7 @@
 - ✅ **Backfill скрипт:** `scripts/backfill_metrics.py` обрабатывает отсутствующие месяцы автоматически
 - ✅ **Фикс rollback бага:** Изолированные транзакции предотвращают потерю данных при дубликатах
 - ✅ **Валидатор OWNER_CHAT_ID:** Преобразование пустой строки в None предотвращает crash бота
+- ✅ **Фильтрация технических записей:** Balancing transaction и переводы пропускаются, отчёты показывают реалистичные суммы
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
@@ -92,27 +99,12 @@
 - ⚠️ Rate type "skip" используется по умолчанию — аналитика с ним ограничена
 
 ## 5. Фокус сессии
-- **Цель:** Завершить Phase 2, финализировать все технические долги, подготовить систему к Phase 3 (СТРАТЕГ)
-- **Last Commit:** Phase 2 complete — ETL rollback fix, volume persistence, DB path fix, OWNER_CHAT_ID validator (7b20e4e)
+- **Цель:** Phase 3 (СТРАТЕГ) — стратегический анализ, рекомендации, симуляции
+- **Last Commit:** Phase 2 complete — Filter Balancing Transactions, STRATEGY.md v1.1 (20ac056)
 - **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен, БД очищена для чистого старта
 
 ## Следующий шаг
-**Phase 2 ЗАВЕРШЁН.** Система в боевом режиме, данные накапливаются.
-
-**Текущий статус данных:**
-- В БД загружено 2117 транзакций (2024-07 — 2026-04)
-- 22 месяца истории в monthly_metrics
-- Все данные в skip mode (UAH без конвертации) — требуется перезагрузка с курсом
-
-**Следующие шаги (в порядке приоритета):**
-1. Очистить БД и перезагрузить CSV с курсом 43.85 для корректной аналитики
-2. Запустить backfill после перезагрузки
-3. Phase 3 (СТРАТЕГ) — старт после накопления 2-3 месяцев чистой истории с курсом
-
-**Known Issues для Phase 3:**
-- ⚠️ "Balancing transaction" записи в CSV искажают доходы — добавить фильтр
-- ⚠️ Invalid baseline для категорий с отрицательными суммами — расходы хранятся как отрицательные числа, guard `<= 0` не срабатывает. См. D-25.
-- ⚠️ Backup стратегия для SQLite volume отсутствует
+**Phase 3 АКТИВНА.** Система готова к стратегическому анализу. База данных очищена, можно загружать CSV с корректными фильтрами для получения реалистичных данных.
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический
@@ -128,6 +120,7 @@
 - ✅ Phase 2, Task #6 — Backfill Historical Metrics (скрипт scripts/backfill_metrics.py)
 - ✅ Phase 2, Task #7 — Persistent SQLite Volume (named volume cfo_data)
 - ✅ Phase 2, Task #8 — Fix ETL Rollback Bug (db.begin_nested() вместо db.rollback())
+- ✅ Phase 2, Task #9 — Filter Balancing Transactions and Internal Transfers (фильтрация технических записей)
 
 ### Открытые решения (не блокируют Phase 3):
 - D-10 Exception Policy — ✅ выполнено (добавлено в STRATEGY.md)

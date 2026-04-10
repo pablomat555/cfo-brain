@@ -14,6 +14,7 @@ class LoadResult(BaseModel):
     """Результат загрузки транзакций"""
     inserted: int = 0
     skipped_duplicates: int = 0
+    skipped_technical: int = 0  # НОВОЕ ПОЛЕ
     errors: int = 0
     detection_status: str = "pending"  # 'pending' | 'running' | 'completed' | 'error' | 'skip_mode'
 

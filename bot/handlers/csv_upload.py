@@ -88,11 +88,13 @@ async def handle_csv_upload(message: types.Message, bot: Bot, state: FSMContext)
                 result = response.json()
                 inserted = result.get("inserted", 0)
                 skipped = result.get("skipped_duplicates", 0)
+                skipped_technical = result.get("skipped_technical", 0)  # НОВОЕ
                 errors = result.get("errors", 0)
                 
                 reply_text = (
                     f"✅ Загружено: {inserted} транзакций.\n"
                     f"📋 Дублей пропущено: {skipped}.\n"
+                    f"⚙️ Технических записей пропущено: {skipped_technical}.\n"
                     f"⚠️ Ошибок: {errors}."
                 )
                 

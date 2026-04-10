@@ -1,5 +1,5 @@
 # STRATEGY.md — Financial Doctrine & Architecture
-# Version: 1.0 | Status: Active (March 2026)
+# Version: 1.1 | Status: Active (апрель 2026)
 
 ## 1. THE DOCTRINE: DEFENSIVE GROWTH (Оборонительный Рост)
 Система работает в условиях повышенного риска (война, энергетическая нестабильность, 100% финансовая ответственность за семью). 
@@ -37,6 +37,30 @@
 - [x] Закрепить буфер $5,000 на Payoneer.
 - [ ] Сформировать капитал $5,000 в SGOV (IBKR).
 - [ ] Успешный pivot бизнес-модели: переход с видеомонтажа на AI-Automation (n8n, Python) без падения Monthly Recurring Revenue (MRR).
+
+## 6. INVESTMENT PORTFOLIO (IBKR — Long-Term)
+**Брокер:** Interactive Brokers (IBKR). Счёт: U21951566. Старт: 2025-09-09.
+
+**Целевая аллокация:**
+- 50% — `VOO` (Vanguard S&P 500, US Large Cap)
+- 35% — `VXUS` (Vanguard Total International Stock)
+- 15% — `QQQM` / `QQQ` (Nasdaq 100, Tech Growth)
+
+**Правила исполнения:**
+- Месячный взнос: **$500** (акции) + опционально $200 в SGOV
+- Стратегия: **Buying Weakness** — докупать отстающего, не продавать
+- Исполнение: market orders, fractional shares разрешены
+- Ребалансировка: только покупками, без продаж
+
+**Текущий статус (апрель 2026):**
+- `QQQM` на **ХОЛДЕ** — Tech сектор в перевесе (~33% vs целевых 15%)
+- Новые покупки: только VOO + VXUS до выравнивания доли Tech
+- `SGOV` — накопление ликвидности параллельно (цель $5,000, Эшелон 3)
+
+**Протокол для CFO-Brain:**
+- Месячный взнос $500 в акции — **стратегическая статья, не трогать**
+- Если QQQM доля < 20% → можно возобновить докупки QQQM
+- Излишек сверх Burn Rate → сначала SGOV до $5k, затем VOO/VXUS
 
 ## Exception Policy
 Три типа расходов:

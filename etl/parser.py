@@ -141,6 +141,11 @@ def parse_csv(file_bytes: bytes, filename: str) -> List[TransactionRaw]:
             description = row.get("Payee", "").strip() or row.get("Description", "").strip()
             category = row.get("Category", "").strip() or None
             
+            # Пропускаем технические записи Balancing transaction
+            if category == "Balancing transaction":
+                logger.info(f"Row {i}: Balancing transaction, skipping")
+                continue
+            
             results.append(TransactionRaw(
                 date=date,
                 description=description,

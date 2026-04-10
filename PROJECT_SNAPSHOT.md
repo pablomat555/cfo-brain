@@ -25,7 +25,7 @@
 - **Deploy:** git push → GitHub Actions → VPS (DEV_PROTOCOL v1.3)
 - **Env Vars (names only):**
   - `TELEGRAM_TOKEN` (установлен в Doppler)
-  - `CFO_DB_URL` (по умолчанию sqlite:///./data/cfo.db)
+  - `CFO_DB_URL` (по умолчанию sqlite:////app/data/cfo.db)
   - `OPENROUTER_API_KEY` (для AI-анализа, опционально)
   - `LOG_LEVEL` (по умолчанию INFO)
   - `OWNER_CHAT_ID` (для еженедельного дайджеста)
@@ -97,17 +97,22 @@
 - **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен, БД очищена для чистого старта
 
 ## Следующий шаг
-**Phase 2 ЗАВЕРШЁН.** Все задачи Phase 2 выполнены, включая дополнительные фиксы:
-1. Volume persistence для сохранения данных между редеплоями
-2. Конфигурация CFO_DB_URL для корректного использования env переменных
-3. Backfill скрипт для обработки исторических данных
-4. Фикс критического rollback бага в ETL pipeline
-5. Валидатор OWNER_CHAT_ID для стабильной работы бота
+**Phase 2 ЗАВЕРШЁН.** Система в боевом режиме, данные накапливаются.
 
-**Phase 3 (СТРАТЕГ)** готов к запуску. Требуется:
-1. Загрузка полного CSV с транзакциями (2024-07 — 2026-04)
-2. Накопление 2-3 месяцев истории для обучения моделей
-3. Настройка курсов валют для корректной аналитики
+**Текущий статус данных:**
+- В БД загружено 2117 транзакций (2024-07 — 2026-04)
+- 22 месяца истории в monthly_metrics
+- Все данные в skip mode (UAH без конвертации) — требуется перезагрузка с курсом
+
+**Следующие шаги (в порядке приоритета):**
+1. Очистить БД и перезагрузить CSV с курсом 43.85 для корректной аналитики
+2. Запустить backfill после перезагрузки
+3. Phase 3 (СТРАТЕГ) — старт после накопления 2-3 месяцев чистой истории с курсом
+
+**Known Issues для Phase 3:**
+- ⚠️ "Balancing transaction" записи в CSV искажают доходы — добавить фильтр
+- ⚠️ Invalid baseline для категорий с отрицательными суммами — расходы хранятся как отрицательные числа, guard `<= 0` не срабатывает. См. D-25.
+- ⚠️ Backup стратегия для SQLite volume отсутствует
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический
@@ -120,6 +125,9 @@
 - ✅ Phase 2, Task #3 — Scheduler + Post-Ingest Alert (APScheduler, bounded polling, исправление D-22)
 - ✅ Phase 2, Task #4 — Integration Smoke Test (все 7 проверок PASS после исправления OWNER_CHAT_ID)
 - ✅ Phase 2, Task #5 — Fix OWNER_CHAT_ID Propagation (добавлен OWNER_CHAT_ID в docker-compose.yml)
+- ✅ Phase 2, Task #6 — Backfill Historical Metrics (скрипт scripts/backfill_metrics.py)
+- ✅ Phase 2, Task #7 — Persistent SQLite Volume (named volume cfo_data)
+- ✅ Phase 2, Task #8 — Fix ETL Rollback Bug (db.begin_nested() вместо db.rollback())
 
 ### Открытые решения (не блокируют Phase 3):
 - D-10 Exception Policy — ✅ выполнено (добавлено в STRATEGY.md)

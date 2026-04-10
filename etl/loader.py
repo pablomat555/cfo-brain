@@ -34,56 +34,55 @@ def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str 
     accounts_mapping = load_accounts_mapping()
     
     for row in rows:
-        try:
-            # Определяем валюту на основе маппинга accounts.yml
-            currency = row.currency
-            if row.account:
-                # Ищем точное совпадение
-                if row.account in accounts_mapping:
-                    currency = accounts_mapping[row.account]
-                else:
-                    # Ищем по wildcard (например, "Bybit*")
-                    for pattern, mapped_currency in accounts_mapping.items():
-                        if "*" in pattern:
-                            prefix = pattern.replace("*", "")
-                            if row.account.startswith(prefix):
-                                currency = mapped_currency
-                                break
+        with db.begin_nested():
+            try:
+                # Определяем валюту на основе маппинга accounts.yml
+                currency = row.currency
+                if row.account:
+                    # Ищем точное совпадение
+                    if row.account in accounts_mapping:
+                        currency = accounts_mapping[row.account]
                     else:
-                        # Если account не найден в маппинге
-                        currency = "UNKNOWN"
-                        logger.warning(f"Account '{row.account}' not found in accounts mapping, currency set to UNKNOWN")
-            else:
-                # Если account отсутствует
-                currency = "UNKNOWN"
-                logger.warning(f"Transaction has no account, currency set to UNKNOWN")
-            
-            # Создаём объект Transaction из TransactionRaw
-            transaction = Transaction(
-                date=row.date.date(),  # храним только дату без времени
-                description=row.description,
-                amount=Decimal(str(row.amount)),
-                currency=currency,
-                category=row.category,
-                account=row.account,
-                source_file=source_file,
-                created_at=datetime.utcnow()
-            )
-            
-            db.add(transaction)
-            db.flush()  # Проверяем constraint без коммита
-            result.inserted += 1
-            
-        except IntegrityError:
-            # Дубликат по уникальному constraint
-            db.rollback()  # Откатываем текущую транзакцию
-            result.skipped_duplicates += 1
-            logger.debug(f"Duplicate transaction skipped: {row.date} {row.amount} {row.account} {row.description}")
-            
-        except Exception as e:
-            db.rollback()
-            result.errors += 1
-            logger.error(f"Error loading transaction {row}: {e}")
+                        # Ищем по wildcard (например, "Bybit*")
+                        for pattern, mapped_currency in accounts_mapping.items():
+                            if "*" in pattern:
+                                prefix = pattern.replace("*", "")
+                                if row.account.startswith(prefix):
+                                    currency = mapped_currency
+                                    break
+                        else:
+                            # Если account не найден в маппинге
+                            currency = "UNKNOWN"
+                            logger.warning(f"Account '{row.account}' not found in accounts mapping, currency set to UNKNOWN")
+                else:
+                    # Если account отсутствует
+                    currency = "UNKNOWN"
+                    logger.warning(f"Transaction has no account, currency set to UNKNOWN")
+                
+                # Создаём объект Transaction из TransactionRaw
+                transaction = Transaction(
+                    date=row.date.date(),  # храним только дату без времени
+                    description=row.description,
+                    amount=Decimal(str(row.amount)),
+                    currency=currency,
+                    category=row.category,
+                    account=row.account,
+                    source_file=source_file,
+                    created_at=datetime.utcnow()
+                )
+                
+                db.add(transaction)
+                db.flush()  # Проверяем constraint без коммита
+                result.inserted += 1
+                
+            except IntegrityError:
+                # Дубликат по уникальному constraint - nested transaction автоматически откатывается
+                result.skipped_duplicates += 1
+                logger.debug(f"Duplicate transaction skipped: {row.date} {row.amount} {row.account} {row.description}")
+                
+            except Exception as e:
+                result.errors += 1
+                logger.error(f"Error loading transaction {row}: {e}")
     
     # Сохраняем метаданные загрузки если транзакции были успешно загружены
     if result.inserted > 0:

@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 08 апреля 2026, 20:33 (Kyiv)
+Последнее обновление: 08 апреля 2026, 22:07 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -31,7 +31,7 @@
   - `OWNER_CHAT_ID` (для еженедельного дайджеста)
 
 ## 4. Текущее состояние
-- **Версия:** v0.6-alpha
+- **Версия:** v0.7-alpha
 - **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН
   - Phase 1, Task #1 ЗАВЕРШЁН (базовая структура)
   - Phase 1, Task #2 ЗАВЕРШЁН (AI вердикт + /report эндпоинт)
@@ -43,6 +43,8 @@
   - Phase 2, Task #1 ЗАВЕРШЁН (Observer Foundation — data layer)
   - Phase 2, Task #2 ЗАВЕРШЁН (Observer API + Bot Surface)
   - Phase 2, Task #3 ЗАВЕРШЁН (Scheduler + Post-Ingest Alert)
+  - Phase 2, Task #4 ✅ ЗАВЕРШЁН (Integration Smoke Test — после исправления OWNER_CHAT_ID все проверки PASS)
+  - Phase 2, Task #5 ✅ ЗАВЕРШЁН (Fix OWNER_CHAT_ID Propagation — добавлен в docker-compose.yml)
 
 ### Что работает
 - ✅ Полная структура repo создана (14+ файлов)
@@ -50,7 +52,7 @@
 - ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period
 - ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report и CSV файлов
 - ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002)
-- ✅ Doppler integration: переменные окружения инжектятся через environment
+- ✅ Doppler integration: переменные окружения инжектятся через environment (включая OWNER_CHAT_ID)
 - ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
 - ✅ Уникальный constraint: (date, amount, account, description)
 - ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты (13 аккаунтов)
@@ -68,8 +70,9 @@
 - ✅ GET /observer/anomalies — аномалии за период с detection_status (D-19)
 - ✅ GET /observer/trends — метрики по месяцам, ASC, с rate_type (D-19)
 - ✅ Команды /anomalies и /trends в боте
-- ✅ APScheduler: еженедельный дайджест (пн 09:00 Europe/Kyiv)
+- ✅ APScheduler: еженедельный дайджест (пн 09:00 Europe/Kyiv) — работает с OWNER_CHAT_ID
 - ✅ Post-ingest alert: bounded polling D-23 (3 попытки, 2с интервал)
+- ✅ Integration Smoke Test: все 7 проверок PASS (после исправления OWNER_CHAT_ID)
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
@@ -77,12 +80,12 @@
 - ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
 
 ## 5. Фокус сессии
-- **Цель:** Phase 2 завершена. Система в production, накапливает историю.
-- **Last Commit:** Phase 2, Task #3 — Scheduler + Post-Ingest Alert
-- **Git Status:** Все изменения закоммичены и запушены.
+- **Цель:** Завершить Phase 2, Task #5 (Fix OWNER_CHAT_ID Propagation) — добавление переменной в docker-compose.yml и повторная проверка Integration Smoke Test.
+- **Last Commit:** Phase 2, Task #5 — fix: add OWNER_CHAT_ID to cfo_bot environment (e5399df)
+- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен.
 
 ## Следующий шаг
-**Phase 2 ЗАВЕРШЁН.** Следующий шаг — накопить 2-3 месяца истории, затем Phase 3 (СТРАТЕГ).
+**Phase 2 ЗАВЕРШЁН.** Все задачи Phase 2 выполнены. Phase 3 (СТРАТЕГ) будет запущен после накопления 2-3 месяцев истории транзакций для обучения моделей.
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический
@@ -93,6 +96,8 @@
 - ✅ Phase 2, Task #1 — Observer Foundation (data layer, три таблицы метрик, сервисы пересчёта и детекции, post-ingest hook)
 - ✅ Phase 2, Task #2 — Observer API + Bot Surface (GET /observer/anomalies, GET /observer/trends, команды /anomalies и /trends в боте)
 - ✅ Phase 2, Task #3 — Scheduler + Post-Ingest Alert (APScheduler, bounded polling, исправление D-22)
+- ✅ Phase 2, Task #4 — Integration Smoke Test (все 7 проверок PASS после исправления OWNER_CHAT_ID)
+- ✅ Phase 2, Task #5 — Fix OWNER_CHAT_ID Propagation (добавлен OWNER_CHAT_ID в docker-compose.yml)
 
 ### Открытые решения (не блокируют Phase 3):
 - D-10 Exception Policy — ✅ выполнено (добавлено в STRATEGY.md)

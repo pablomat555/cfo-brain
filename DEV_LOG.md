@@ -298,5 +298,59 @@
 ### Known Issue
 - **APScheduler shutdown hook отсутствует** — возможны warnings при docker stop. Отложено на Phase 3.
 
+### Phase 2, Task #4 — Integration Smoke Test
+**Дата:** 08 апреля 2026, 21:00 (Kyiv)
+**Статус:** ❌ НЕ ЗАВЕРШЕН (есть FAIL)
+
+**Выполнено:**
+- Проведены живые проверки на VPS по чеклисту из 7 пунктов.
+- 5 из 7 проверок прошли успешно (GET /health, GET /observer/anomalies, GET /observer/trends, команды бота, ingest CSV + bounded polling).
+- 2 проверки не пройдены: Scheduler не стартовал и weekly_digest не доставлен из-за отсутствия OWNER_CHAT_ID в environment контейнера.
+
+**Обнаруженная проблема:**
+- OWNER_CHAT_ID установлен в Doppler, но не добавлен в секцию environment сервиса cfo_bot в docker-compose.yml, поэтому переменная не инжектируется в контейнер.
+
+**Рекомендация:**
+Создать Task #5 для добавления `OWNER_CHAT_ID: ${OWNER_CHAT_ID}` в docker-compose.yml. После исправления повторить проверки 1 и 7.
+
 ### Следующий шаг:
 - Phase 2 ЗАВЕРШЁН. Накопить 2-3 месяца истории, затем Phase 3 (СТРАТЕГ).
+
+---
+
+### Phase 2, Task #5 — Fix OWNER_CHAT_ID Propagation
+**Дата:** 08 апреля 2026, 22:07 (Kyiv)
+**Статус:** ✅ ЗАВЕРШЕН
+
+**Контекст:**
+- **Цель:** Добавить `OWNER_CHAT_ID: ${OWNER_CHAT_ID}` в секцию environment сервиса cfo_bot в docker-compose.yml, чтобы переменная инжектировалась из Doppler в контейнер.
+- **Задача:** L1 (простая) — одна операция, один файл, очевидный scope.
+- **Фаза:** Phase 2 — CI/CD & PRODUCTION (последняя задача перед завершением Phase 2).
+
+**Выполненные работы:**
+1. **Проверка OWNER_CHAT_ID в Doppler:** Подтверждено что переменная установлена в проекте cfo-brain / prd.
+2. **Изменение [`docker-compose.yml`](docker-compose.yml:22-35):** Добавлена строка `- OWNER_CHAT_ID=${OWNER_CHAT_ID}` в блок environment сервиса cfo_bot.
+3. **Git операции:**
+   - `git add docker-compose.yml`
+   - `git commit -m "fix: add OWNER_CHAT_ID to cfo_bot environment"`
+   - `git push` (коммит e5399df)
+4. **Деплой на VPS:** GitHub Actions workflow автоматически развернул изменения на VPS.
+5. **Проверка scheduler:** После деплоя проверено что scheduler стартовал:
+   ```
+   cfo_bot-1  | 2026-04-08 19:01:30 | INFO     | bot.scheduler:setup_scheduler:137 - Scheduler configured for chat 609444772 (Monday 09:00 Europe/Kyiv)
+   cfo_bot-1  | 2026-04-08 19:01:30 | INFO     | __main__:main:48 - Scheduler started for chat_id=609444772
+   ```
+6. **Повторение проверок 1 и 7 из Task #4:**
+   - **Проверка 1 (Scheduler стартовал):** ✅ PASS — scheduler показывает "Scheduler started for chat_id=609444772"
+   - **Проверка 7 (Принудительный запуск weekly_digest):** ✅ PASS — weekly_digest успешно отправлен в Telegram (лог: "Weekly digest sent to chat 609444772")
+
+**Результаты:**
+- **Definition of Done выполнены:** Все чекбоксы TASK.md отмечены.
+- **PROJECT_SNAPSHOT.md обновлён:** Phase 2 помечен как ЗАВЕРШЁН, версия v0.7-alpha.
+- **Phase 2 завершён:** Все 5 задач Phase 2 выполнены.
+
+**Observations outside scope:**
+- Нет — задача полностью в scope, все изменения ограничены docker-compose.yml.
+
+**Следующий шаг:**
+- Phase 2 завершён. Phase 3 (СТРАТЕГ) будет запущен после накопления 2-3 месяцев истории транзакций для обучения моделей.

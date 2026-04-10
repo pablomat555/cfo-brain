@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 08 апреля 2026, 22:07 (Kyiv)
+Последнее обновление: 10 апреля 2026, 21:04 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -31,8 +31,8 @@
   - `OWNER_CHAT_ID` (для еженедельного дайджеста)
 
 ## 4. Текущее состояние
-- **Версия:** v0.7-alpha
-- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН
+- **Версия:** v0.8-alpha
+- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 ГОТОВ К СТАРТУ
   - Phase 1, Task #1 ЗАВЕРШЁН (базовая структура)
   - Phase 1, Task #2 ЗАВЕРШЁН (AI вердикт + /report эндпоинт)
   - Phase 1, Task #3 ЗАВЕРШЁН (port change 8001 → 8002)
@@ -45,14 +45,20 @@
   - Phase 2, Task #3 ЗАВЕРШЁН (Scheduler + Post-Ingest Alert)
   - Phase 2, Task #4 ✅ ЗАВЕРШЁН (Integration Smoke Test — после исправления OWNER_CHAT_ID все проверки PASS)
   - Phase 2, Task #5 ✅ ЗАВЕРШЁН (Fix OWNER_CHAT_ID Propagation — добавлен в docker-compose.yml)
+  - **Дополнительные задачи Phase 2:**
+    - ✅ **Volume persistence** — добавлен named volume `cfo_data` для `/app/data`
+    - ✅ **Конфигурация CFO_DB_URL** — исправлено поле `cfo_db_url` для использования env переменной
+    - ✅ **Backfill скрипт** — создан `scripts/backfill_metrics.py` для обработки отсутствующих месяцев
+    - ✅ **Фикс rollback бага** — исправлен деструктивный паттерн в `etl/loader.py` через `db.begin_nested()`
+    - ✅ **Валидатор OWNER_CHAT_ID** — добавлен validator для преобразования пустой строки в None
 
 ### Что работает
-- ✅ Полная структура repo создана (14+ файлов)
-- ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite
-- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period
-- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report и CSV файлов
-- ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002)
-- ✅ Doppler integration: переменные окружения инжектятся через environment (включая OWNER_CHAT_ID)
+- ✅ Полная структура repo создана (20+ файлов)
+- ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite с isolated transactions через `db.begin_nested()`
+- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period, GET /observer/anomalies, GET /observer/trends
+- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends и CSV файлов
+- ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002) и named volume `cfo_data`
+- ✅ Doppler integration: переменные окружения инжектятся через environment (TELEGRAM_TOKEN, CFO_DB_URL, OWNER_CHAT_ID, OPENROUTER_API_KEY, LOG_LEVEL)
 - ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
 - ✅ Уникальный constraint: (date, amount, account, description)
 - ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты (13 аккаунтов)
@@ -61,7 +67,7 @@
 - ✅ Модель PeriodReport с полем period_type (core/models.py)
 - ✅ Агрегация транзакций (analytics/aggregator.py)
 - ✅ Команда /report в боте: получает отчёт за текущий месяц через API
-- ✅ AI вердикт возвращается в ответе API (исправлено в коммите ab9cfd0)
+- ✅ AI вердикт возвращается в ответе API
 - ✅ Автоопределение периода для команды /report (D-13): система запоминает даты последнего CSV и использует их при вызове /report без параметров
 - ✅ Поддержка параметра /report YYYY-MM для явного указания месяца
 - ✅ Увеличен timeout для fetch_report до 60 секунд (предотвращение таймаутов при генерации отчётов)
@@ -72,20 +78,36 @@
 - ✅ Команды /anomalies и /trends в боте
 - ✅ APScheduler: еженедельный дайджест (пн 09:00 Europe/Kyiv) — работает с OWNER_CHAT_ID
 - ✅ Post-ingest alert: bounded polling D-23 (3 попытки, 2с интервал)
-- ✅ Integration Smoke Test: все 7 проверок PASS (после исправления OWNER_CHAT_ID)
+- ✅ Integration Smoke Test: все 7 проверок PASS
+- ✅ **Volume persistence:** Данные сохраняются между редеплоями через named volume `cfo_data`
+- ✅ **Конфигурация CFO_DB_URL:** Приложение использует env переменную для пути к БД
+- ✅ **Backfill скрипт:** `scripts/backfill_metrics.py` обрабатывает отсутствующие месяцы автоматически
+- ✅ **Фикс rollback бага:** Изолированные транзакции предотвращают потерю данных при дубликатах
+- ✅ **Валидатор OWNER_CHAT_ID:** Преобразование пустой строки в None предотвращает crash бота
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
 - ⚠️ Двойной commit в etl/loader.py (один для upload session, другой для транзакций) — может быть оптимизировано
 - ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
+- ⚠️ Rate type "skip" используется по умолчанию — аналитика с ним ограничена
 
 ## 5. Фокус сессии
-- **Цель:** Завершить Phase 2, Task #5 (Fix OWNER_CHAT_ID Propagation) — добавление переменной в docker-compose.yml и повторная проверка Integration Smoke Test.
-- **Last Commit:** Phase 2, Task #5 — fix: add OWNER_CHAT_ID to cfo_bot environment (e5399df)
-- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен.
+- **Цель:** Завершить Phase 2, финализировать все технические долги, подготовить систему к Phase 3 (СТРАТЕГ)
+- **Last Commit:** Phase 2 complete — ETL rollback fix, volume persistence, DB path fix, OWNER_CHAT_ID validator (7b20e4e)
+- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен, БД очищена для чистого старта
 
 ## Следующий шаг
-**Phase 2 ЗАВЕРШЁН.** Все задачи Phase 2 выполнены. Phase 3 (СТРАТЕГ) будет запущен после накопления 2-3 месяцев истории транзакций для обучения моделей.
+**Phase 2 ЗАВЕРШЁН.** Все задачи Phase 2 выполнены, включая дополнительные фиксы:
+1. Volume persistence для сохранения данных между редеплоями
+2. Конфигурация CFO_DB_URL для корректного использования env переменных
+3. Backfill скрипт для обработки исторических данных
+4. Фикс критического rollback бага в ETL pipeline
+5. Валидатор OWNER_CHAT_ID для стабильной работы бота
+
+**Phase 3 (СТРАТЕГ)** готов к запуску. Требуется:
+1. Загрузка полного CSV с транзакциями (2024-07 — 2026-04)
+2. Накопление 2-3 месяцев истории для обучения моделей
+3. Настройка курсов валют для корректной аналитики
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический

@@ -354,3 +354,98 @@
 
 **Следующий шаг:**
 - Phase 2 завершён. Phase 3 (СТРАТЕГ) будет запущен после накопления 2-3 месяцев истории транзакций для обучения моделей.
+
+---
+
+## Сессия: Phase 2 — Дополнительные фиксы и финализация
+**Дата:** 10 апреля 2026, 21:04 (Kyiv)
+**Статус:** ✅ ЗАВЕРШЕН
+
+**Контекст:**
+После завершения Phase 2 выявлены дополнительные технические долги, требующие фикса перед переходом к Phase 3:
+1. **Volume persistence** — данные терялись при редеплое контейнеров
+2. **Конфигурация CFO_DB_URL** — приложение игнорировало env переменную, писало в `/app/cfo.db` вместо volume-mounted пути
+3. **Backfill скрипт** — отсутствовал механизм обработки исторических данных
+4. **Критический rollback баг** — `db.rollback()` внутри цикла ETL уничтожал успешно вставленные строки
+5. **OWNER_CHAT_ID валидация** — пустая строка вызывала crash бота
+
+**Выполненные работы:**
+
+### 1. Volume persistence
+- **Проблема:** Данные SQLite терялись при `docker compose up --build`
+- **Решение:** Добавлен named volume `cfo_data` в [`docker-compose.yml`](docker-compose.yml)
+- **Изменения:**
+  ```yaml
+  services:
+    cfo_api:
+      volumes:
+        - cfo_data:/app/data
+  volumes:
+    cfo_data:
+  ```
+- **Результат:** Данные сохраняются между редеплоями
+
+### 2. Конфигурация CFO_DB_URL
+- **Проблема:** Приложение использовало хардкод `sqlite:///./cfo.db` вместо `CFO_DB_URL` env переменной
+- **Решение:** Переименовано поле `db_url` → `cfo_db_url` в [`core/config.py`](core/config.py) с дефолтным значением `"sqlite:////app/data/cfo.db"`
+- **Обновлено:** [`core/database.py`](core/database.py) для использования `settings.cfo_db_url`
+- **Результат:** Приложение пишет данные в volume-mounted путь `/app/data/cfo.db`
+
+### 3. Backfill скрипт
+- **Создан:** [`scripts/backfill_metrics.py`](scripts/backfill_metrics.py)
+- **Функциональность:** Находит месяцы с транзакциями но без метрик, вызывает `recalculate()` и `scan()` для каждого
+- **Использование:** `docker exec cfo-brain-cfo_api-1 python3 -m scripts.backfill_metrics`
+- **Результат:** Автоматическая обработка исторических данных
+
+### 4. Фикс критического rollback бага
+- **Проблема:** В [`etl/loader.py`](etl/loader.py) `db.rollback()` внутри цикла обработки строк откатывал всю внешнюю транзакцию
+- **Симптом:** Бот сообщал "✅ Загружено: 1680 транзакций", но в БД оставалось только 433 записи
+- **Решение:** Использование `db.begin_nested()` для изоляции обработки каждой строки
+- **Изменения:**
+  ```python
+  # БЫЛО:
+  for row in rows:
+      try:
+          db.add(transaction)
+          db.flush()
+      except IntegrityError:
+          db.rollback()  # ← уничтожал предыдущие вставки
+  
+  # СТАЛО:
+  for row in rows:
+      with db.begin_nested():  # ← изолированная транзакция
+          try:
+              db.add(transaction)
+              db.flush()
+          except IntegrityError:
+              # nested transaction автоматически откатывается
+  ```
+- **Валидация:** После фикса загрузка CSV увеличивает количество транзакций с 433 до 2117 (корректное сохранение всех данных)
+
+### 5. Валидатор OWNER_CHAT_ID
+- **Проблема:** Пустая строка из env переменной вызывала `ValidationError: Input should be a valid integer`
+- **Решение:** Добавлен validator в [`core/config.py`](core/config.py):
+  ```python
+  @validator("owner_chat_id", pre=True)
+  def empty_string_to_none(cls, v):
+      if v == "":
+          return None
+      return v
+  ```
+- **Результат:** Бот запускается без ошибок даже при пустом значении переменной
+
+**Валидация:**
+1. **Volume persistence:** После `docker compose up --build` данные сохраняются
+2. **Конфигурация:** `settings.cfo_db_url` возвращает `sqlite:////app/data/cfo.db`
+3. **Backfill:** Скрипт обрабатывает отсутствующие месяцы, выводит "Nothing to backfill" при полной синхронизации
+4. **Rollback фикс:** Загрузка CSV сохраняет все 1680+ транзакций
+5. **API endpoints:** `/observer/trends` и `/observer/anomalies` работают корректно
+
+**Результаты:**
+- **PROJECT_SNAPSHOT.md обновлён:** Версия v0.8-alpha, Phase 2 завершён, Phase 3 готов к старту
+- **БД очищена:** Для чистого старта Phase 3 все таблицы очищены
+- **Коммит:** `7b20e4e` — "fix: Phase 2 complete — ETL rollback fix, volume persistence, DB path fix, OWNER_CHAT_ID validator"
+
+**Следующий шаг:**
+- **Phase 3 (СТРАТЕГ):** Запуск после загрузки полного CSV с транзакциями (2024-07 — 2026-04)
+- **Требования:** Накопление 2-3 месяцев истории для обучения моделей, настройка курсов валют

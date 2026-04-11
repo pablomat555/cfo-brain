@@ -62,7 +62,10 @@ def upsert_account_balance(
             logger.info(f"Created new account balance: {account_data.account_name} for {as_of_date}")
         
         # Вычисляем balance_usd для ответа
-        balance_usd = account.balance * account.fx_rate
+        if account.fx_rate != 0:
+            balance_usd = account.balance / account.fx_rate
+        else:
+            balance_usd = 0.0
         
         return AccountBalanceResponse(
             id=account.id,
@@ -130,7 +133,10 @@ def get_capital_state(
             if bucket not in by_bucket:
                 continue
                 
-            balance_usd = balance.balance * balance.fx_rate
+            if balance.fx_rate != 0:
+                balance_usd = balance.balance / balance.fx_rate
+            else:
+                balance_usd = 0.0
             total_net_worth_usd += balance_usd
             by_bucket[bucket]["total_usd"] += balance_usd
             

@@ -1,12 +1,12 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 10 апреля 2026, 21:56 (Kyiv)
+Последнее обновление: 11 апреля 2026, 20:56 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
 - **Owner:** Я
 - **Repo:** git@github.com:pablomat555/cfo-brain.git
 - **Стек:** Python · aiogram 3.x · FastAPI · SQLite · Docker Compose · Doppler
-- **Текущая фаза:** Phase 3 — СТРАТЕГ
+- **Текущая фаза:** Phase 2 ЗАВЕРШЁН → Phase 3 ожидает загрузки данных
 
 ## 2. Архитектура
 - **Flow:** Telegram → Bot Gateway → CFO Brain API → ETL Pipeline → SQLite → Response
@@ -32,7 +32,7 @@
 
 ## 4. Текущее состояние
 - **Версия:** v0.9-alpha
-- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 АКТИВНА
+- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 АКТИВНА (Capital Snapshot MVP)
   - Phase 1, Task #1 ЗАВЕРШЁН (базовая структура)
   - Phase 1, Task #2 ЗАВЕРШЁН (AI вердикт + /report эндпоинт)
   - Phase 1, Task #3 ЗАВЕРШЁН (port change 8001 → 8002)
@@ -49,6 +49,7 @@
   - Phase 2, Task #7 ✅ ЗАВЕРШЁН (Persistent SQLite Volume)
   - Phase 2, Task #8 ✅ ЗАВЕРШЁН (Fix ETL Rollback Bug)
   - Phase 2, Task #9 ✅ ЗАВЕРШЁН (Filter Balancing Transactions and Internal Transfers)
+  - Phase 3, Task #1A ✅ ЗАВЕРШЁН (Capital Snapshot MVP — таблицы, API, бот команды)
   - **Дополнительные задачи Phase 2:**
     - ✅ **Volume persistence** — добавлен named volume `cfo_data` для `/app/data`
     - ✅ **Конфигурация CFO_DB_URL** — исправлено поле `cfo_db_url` для использования env переменной
@@ -61,8 +62,8 @@
 - ✅ Полная структура repo создана (20+ файлов)
 - ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite с isolated transactions через `db.begin_nested()`
 - ✅ Фильтрация: Balancing transaction и переводы между счетами пропускаются
-- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period, GET /observer/anomalies, GET /observer/trends
-- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends и CSV файлов
+- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period, GET /observer/anomalies, GET /observer/trends, POST /ingest/capital_snapshot, GET /capital/state, POST /capital/account, GET /capital/accounts
+- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends, /capital, /capital_add, /capital_edit и CSV файлов
 - ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002) и named volume `cfo_data`
 - ✅ Doppler integration: переменные окружения инжектятся через environment (TELEGRAM_TOKEN, CFO_DB_URL, OWNER_CHAT_ID, OPENROUTER_API_KEY, LOG_LEVEL)
 - ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
@@ -97,14 +98,31 @@
 - ⚠️ Двойной commit в etl/loader.py (один для upload session, другой для транзакций) — может быть оптимизировано
 - ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
 - ⚠️ Rate type "skip" используется по умолчанию — аналитика с ним ограничена
+- ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
 
 ## 5. Фокус сессии
-- **Цель:** Phase 3 (СТРАТЕГ) — стратегический анализ, рекомендации, симуляции
-- **Last Commit:** Phase 2 complete — Filter Balancing Transactions, STRATEGY.md v1.1 (20ac056)
-- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен, БД очищена для чистого старта
+- **Цель:** Деплой Capital Snapshot MVP, smoke test, подготовка к Task #1B (Portfolio Positions)
+- **Last Commit:** Phase 3 Task #1A complete — Capital Snapshot MVP (таблицы, API, бот команды)
+- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS ожидает git push
 
 ## Следующий шаг
-**Phase 3 АКТИВНА.** Система готова к стратегическому анализу. База данных очищена, можно загружать CSV с корректными фильтрами для получения реалистичных данных.
+**Phase 3 АКТИВНА. Capital Snapshot MVP реализован.**
+
+**Немедленные действия:**
+1. **Деплой на VPS** — `git push` → CI/CD → проверить что контейнеры поднялись
+2. **Smoke test** — `/capital_add` 4 счёта → `/capital` → проверить net worth
+3. **Обновить PROJECT_SNAPSHOT.md** — Phase 3 Task #1A ✅, добавить новые эндпоинты в список "что работает"
+
+**Phase 3, Task #1B — Portfolio Positions** (следующий этап):
+- Загрузка позиций из IBKR, Bybit (CSV/API)
+- Интеграция с таблицей portfolio_positions
+- Расчёт рыночной стоимости и ликвидности
+
+**Known Issues для Phase 3:**
+- ⚠️ "Balancing transaction" фильтр добавлен но старые данные очищены — нужна перезагрузка
+- ⚠️ Invalid baseline для категорий с отрицательными суммами (D-25) — расходы хранятся как отрицательные числа
+- ⚠️ Backup стратегия для SQLite volume отсутствует
+- ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический

@@ -174,3 +174,115 @@ class AnomalyEventResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Capital Snapshot Models
+
+class AccountBalance(Base):
+    """SQLAlchemy модель для таблицы account_balances"""
+    __tablename__ = "account_balances"
+
+    id = Column(Integer, primary_key=True)
+    account_name = Column(String, nullable=False)
+    balance = Column(Float, nullable=False)
+    currency = Column(String, nullable=False)
+    fx_rate = Column(Float, nullable=False, default=1.0)
+    bucket = Column(String, nullable=False)  # liquid, semi_liquid, investment
+    as_of_date = Column(Date, nullable=False)
+    source = Column(String, nullable=False, default="manual")  # manual, csv
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("account_name", "as_of_date", name="uq_account_balance"),
+    )
+
+    def __repr__(self):
+        return f"<AccountBalance(account_name={self.account_name}, balance={self.balance}, " \
+               f"currency={self.currency}, bucket={self.bucket}, as_of_date={self.as_of_date})>"
+
+
+class PortfolioPosition(Base):
+    """SQLAlchemy модель для таблицы portfolio_positions"""
+    __tablename__ = "portfolio_positions"
+
+    id = Column(Integer, primary_key=True)
+    account_name = Column(String, nullable=False)
+    asset_symbol = Column(String, nullable=False)
+    asset_type = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    market_value = Column(Float, nullable=False)
+    currency = Column(String, nullable=False)
+    fx_rate = Column(Float, nullable=False, default=1.0)
+    liquidity_bucket = Column(String, nullable=False)  # liquid, semi_liquid, investment
+    as_of_date = Column(Date, nullable=False)
+    source = Column(String, nullable=False, default="manual")  # manual, csv
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("account_name", "asset_symbol", "as_of_date", name="uq_portfolio_position"),
+    )
+
+    def __repr__(self):
+        return f"<PortfolioPosition(account_name={self.account_name}, asset_symbol={self.asset_symbol}, " \
+               f"market_value={self.market_value}, currency={self.currency}, as_of_date={self.as_of_date})>"
+
+
+# Pydantic модели для Capital Snapshot API
+
+class AccountBalanceCreate(BaseModel):
+    """Pydantic модель для создания/обновления баланса счёта"""
+    account_name: str
+    balance: float
+    currency: str
+    fx_rate: float = 1.0
+    bucket: str  # liquid, semi_liquid, investment
+    as_of_date: str  # YYYY-MM-DD
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class AccountBalanceResponse(BaseModel):
+    """Pydantic модель для ответа API с балансом счёта"""
+    id: int
+    account_name: str
+    balance: float
+    currency: str
+    fx_rate: float
+    bucket: str
+    as_of_date: str
+    source: str
+    created_at: str
+    updated_at: str
+    balance_usd: float  # вычисленное поле: balance * fx_rate
+
+    class Config:
+        from_attributes = True
+
+
+class CapitalStateResponse(BaseModel):
+    """Pydantic модель для ответа API с состоянием капитала"""
+    as_of_date: str
+    total_net_worth_usd: float
+    by_bucket: Dict[str, Dict[str, Any]]
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class AccountListResponse(BaseModel):
+    """Pydantic модель для ответа API со списком счетов"""
+    accounts: List[str]
+
+
+class CapitalSnapshotIngestResponse(BaseModel):
+    """Pydantic модель для ответа API при загрузке снапшота"""
+    rows_loaded: int
+    snapshot_type: str  # account | portfolio
+    as_of_date: str
+    accounts: List[str]

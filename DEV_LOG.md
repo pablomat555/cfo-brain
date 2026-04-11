@@ -1,5 +1,5 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 10 апреля 2026, 21:57 (Kyiv)
+Последнее обновление: 11 апреля 2026, 20:56 (Kyiv)
 
 ## Phase Transition: Phase 2 → Phase 3
 **Дата:** 10 апреля 2026
@@ -33,6 +33,58 @@
 ### Следующий шаг:
 - **Phase 3 (СТРАТЕГ):** Стратегический анализ, рекомендации по распределению капитала, симуляции финансовых сценариев
 - **Требования:** Загрузка полного CSV с транзакциями (2024-07 — 2026-04) с применением новых фильтров
+
+---
+
+## Сессия: Phase 3, Task #1A — Capital Snapshot MVP
+**Дата:** 11 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- **Цель:** Создать минимальный надёжный источник истины для состояния капитала (отдельный контур от транзакций)
+- **Проблема:** Flow (transactions) ≠ State (snapshot). Нужен snapshot текущих балансов для стратегического анализа.
+- **Задача:** L2 (средняя) — создание таблиц БД, API эндпоинтов, FSM wizard в боте
+- **Фаза:** Phase 3 — СТРАТЕГ (первая задача)
+
+### Выполненные работы
+1. **Создание миграции** [`core/migrations/003_capital_snapshot_tables.sql`](core/migrations/003_capital_snapshot_tables.sql):
+   - Таблица `account_balances` для балансов счетов
+   - Таблица `portfolio_positions` для позиций портфеля (структура, данные в Task #1B)
+
+2. **Добавление моделей** в [`core/models.py`](core/models.py):
+   - `AccountBalance`, `PortfolioPosition` (SQLAlchemy)
+   - `AccountBalanceCreate`, `CapitalStateResponse` (Pydantic)
+
+3. **Реализация API роутера** [`api/routers/capital.py`](api/routers/capital.py):
+   - `POST /ingest/capital_snapshot` — загрузка CSV снапшота
+   - `GET /capital/state` — состояние капитала с группировкой по bucket
+   - `POST /capital/account` — upsert одной записи
+   - `GET /capital/accounts` — список счетов
+
+4. **Создание отдельного парсера** [`etl/capital_parser.py`](etl/capital_parser.py):
+   - Изолированный контур согласно D-26 (Dual Input Model)
+
+5. **Реализация Telegram бот хендлеров** [`bot/handlers/capital.py`](bot/handlers/capital.py):
+   - Команда `/capital` — отображение состояния капитала
+   - FSM wizard `/capital_add` — пошаговое добавление счёта
+   - FSM wizard `/capital_edit` — редактирование существующего счёта (упрощённое — только баланс)
+
+6. **Интеграция и тестирование**:
+   - Создана фикстура [`fixtures/capital_snapshot_example.csv`](fixtures/capital_snapshot_example.csv)
+   - Написан интеграционный тест [`test_capital_integration.py`](test_capital_integration.py)
+   - Все пункты Definition of Done выполнены
+
+### Результаты
+- ✅ Capital Snapshot MVP реализован согласно спецификации TASK.md
+- ✅ Отдельный контур snapshot vs transactions (D-26)
+- ✅ Telegram wizard как основной UX (D-29)
+- ✅ Все эндпоинты работают, бот команды доступны
+- ✅ Известный issue: `/capital_edit` обновляет только баланс (требует доработки в Task #1B)
+
+### Следующий шаг:
+- **Деплой на VPS** — `git push` → CI/CD → smoke test
+- **Task #1B** — Portfolio Positions (загрузка позиций из IBKR, Bybit)
 
 ---
 

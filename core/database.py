@@ -16,6 +16,9 @@ def init_db():
     
     # Дополнительно применяем миграцию 002 если таблицы observer не существуют
     apply_observer_migration()
+    
+    # Применяем миграцию 003 если таблицы капитального снапшота не существуют
+    apply_capital_snapshot_migration()
 
 
 def apply_observer_migration():
@@ -57,6 +60,48 @@ def apply_observer_migration():
         
     except Exception as e:
         logger.error(f"Error applying migration 002: {e}")
+        # Не падаем, т.к. таблицы могут быть созданы через Base.metadata.create_all
+
+
+def apply_capital_snapshot_migration():
+    """Применяет миграцию 003_capital_snapshot_tables.sql если таблицы не существуют"""
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    
+    capital_tables = {"account_balances", "portfolio_positions"}
+    tables_exist = all(table in existing_tables for table in capital_tables)
+    
+    if tables_exist:
+        logger.debug("Capital snapshot tables already exist, skipping migration 003")
+        return
+    
+    logger.info("Applying migration 003: creating capital snapshot tables")
+    
+    migration_path = os.path.join(os.path.dirname(__file__), "migrations", "003_capital_snapshot_tables.sql")
+    
+    if not os.path.exists(migration_path):
+        logger.error(f"Migration file not found: {migration_path}")
+        # Таблицы будут созданы через Base.metadata.create_all выше
+        return
+    
+    try:
+        with open(migration_path, 'r') as f:
+            sql_content = f.read()
+        
+        # Выполняем SQL миграцию
+        with engine.connect() as conn:
+            # SQLite требует выполнения каждого statement отдельно
+            statements = sql_content.split(';')
+            for statement in statements:
+                statement = statement.strip()
+                if statement:
+                    conn.execute(text(statement))
+            conn.commit()
+        
+        logger.info("Migration 003 applied successfully")
+        
+    except Exception as e:
+        logger.error(f"Error applying migration 003: {e}")
         # Не падаем, т.к. таблицы могут быть созданы через Base.metadata.create_all
 
 

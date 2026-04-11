@@ -1,115 +1,159 @@
-# TASK: Phase 2, Task #9 — Filter Balancing Transactions and Internal Transfers
+# TASK: Phase 3 / Task #1A — Capital Snapshot MVP
 
-**Создан:** 10 апреля 2026, 21:23 (Kyiv)
+**Создан:** 11 апреля 2026
+**Завершён:** 11 апреля 2026
 **Уровень:** L2
-**Статус:** pending
+**Статус:** completed
 
 ## Цель
-Добавить фильтрацию технических записей (Balancing transaction) и внутренних переводов в ETL pipeline, чтобы общий отчёт показывал реалистичные суммы доходов/расходов.
+Минимальный надёжный источник истины для состояния капитала.
+Flow (transactions) ≠ State (snapshot). Контуры не смешивать.
+
+## Архитектурные правила (обязательны)
+- D-26: Dual Input Model — snapshot отдельный контур от transactions
+- D-27: fx_rate хранится в snapshot, не вычисляется задним числом
+- D-28: Bot/FSM только собирает поля и вызывает API. Вся логика в API.
+- D-29: Telegram wizard — основной UX. CSV — вспомогательный.
 
 ## Scope
-Файлы и директории в scope:
-- `etl/parser.py` — добавить фильтрацию Balancing transaction
-- `etl/loader.py` — добавить поле `skipped_technical` в LoadResult
-- `api/routers/ingest.py` — response_model автоматически подхватит новое поле
-- `bot/handlers/csv_upload.py` — обновить ответ бота для показа skipped_technical
 
-Вне scope (не трогать):
-- Все остальные файлы
-- Изменения в analytics, metrics_service, anomaly_service
-- Изменения в docker-compose, Doppler, volume
-- Рефакторинг ETL pipeline
-- Фильтрация других категорий
+### 1. DB Schema
 
-## Проблема
-Общий отчёт показывает нереалистичные суммы:
-- Доходы $111,480 за весь период вместо реальных ~$3,800/мес
-- Причина: Balancing transaction записи и переводы между счетами считаются как доход/расход хотя это технические операции
+Таблица `account_balances`:
+| Поле | Тип | Примечание |
+|---|---|---|
+| id | int PK | |
+| account_name | str | |
+| balance | float | |
+| currency | str | |
+| fx_rate | float | 1.0 для USD/USDT |
+| bucket | str | liquid / semi_liquid / investment |
+| as_of_date | date | |
+| source | str | manual / csv |
+| created_at | datetime | |
+| updated_at | datetime | upsert обновляет это поле |
 
-Примеры из CSV:
-- "24 July 2024","","Balancing transaction","","","","Binance","","40 000,00"
-- "20 March 2026","","","","","","Bybit*","Моно 8235","-1 000,00" ← Transfer Account заполнен
-- "20 March 2026","","","","","","Моно 8235","Bybit*","44 500,00" ← Transfer Account заполнен
+Таблица `portfolio_positions` — создать структуру, данные в Task #1B:
+| Поле | Тип |
+|---|---|
+| id | int PK |
+| account_name | str |
+| asset_symbol | str |
+| asset_type | str |
+| quantity | float |
+| market_value | float |
+| currency | str |
+| fx_rate | float |
+| liquidity_bucket | str |
+| as_of_date | date |
+| source | str |
+| created_at | datetime |
 
-## Текущее состояние
-1. **Фильтрация переводов уже реализована** в `etl/parser.py` (строки 132-138):
-   ```python
-   transfer_account = row.get("Transfer Account", "").strip()
-   is_transfer = bool(transfer_account)
-   if is_transfer:
-       logger.info(f"Row {i}: transfer transaction..., skipping")
-       continue
-   ```
-2. **Фильтрация Balancing transaction отсутствует** — нужно добавить
-3. **LoadResult** в `etl/loader.py` содержит поля: `inserted`, `skipped_duplicates`, `errors`, `detection_status`
-4. **Ответ бота** в `bot/handlers/csv_upload.py` показывает только `inserted`, `skipped_duplicates`, `errors`
+Upsert: по (account_name, as_of_date). Повторная загрузка перезаписывает.
 
-## Решение
+### 2. API endpoints
 
-### Правило 1: Пропускать Balancing transaction
-Добавить в `etl/parser.py` после парсинга категории:
-```python
-category = row.get("Category", "").strip() or None
-
-# Пропускаем технические записи Balancing transaction
-if category == "Balancing transaction":
-    logger.info(f"Row {i}: Balancing transaction, skipping")
-    continue
+**POST /ingest/capital_snapshot**
+- multipart/form-data: file (CSV), snapshot_type (account | portfolio)
+- Парсинг → upsert в соответствующую таблицу
+- Response:
+```json
+{
+  "rows_loaded": 4,
+  "snapshot_type": "account",
+  "as_of_date": "2026-04-11",
+  "accounts": ["Payoneer", "Monobank UAH", "Bybit", "IBKR"]
+}
 ```
 
-### Правило 2: Уже реализовано — пропускать переводы между счетами
-(Оставить существующую логику)
-
-### Обновление LoadResult
-В `etl/loader.py` добавить поле `skipped_technical` в класс `LoadResult`:
-```python
-class LoadResult(BaseModel):
-    """Результат загрузки транзакций"""
-    inserted: int = 0
-    skipped_duplicates: int = 0
-    skipped_technical: int = 0  # НОВОЕ ПОЛЕ
-    errors: int = 0
-    detection_status: str = "pending"  # 'pending' | 'running' | 'completed' | 'error' | 'skip_mode'
+**GET /capital/state**
+- Query param: as_of_date (optional, default: latest available)
+- Логика: читает account_balances → считает balance * fx_rate для USD → группирует по bucket
+- Response:
+```json
+{
+  "as_of_date": "2026-04-11",
+  "total_net_worth_usd": 56305.0,
+  "by_bucket": {
+    "liquid": {
+      "total_usd": 8305.0,
+      "accounts": [
+        {"account_name": "Payoneer", "balance": 4200, "currency": "USD", "balance_usd": 4200},
+        {"account_name": "Monobank UAH", "balance": 180000, "currency": "UAH", "fx_rate": 43.85, "balance_usd": 4105}
+      ]
+    },
+    "semi_liquid": { "total_usd": 3500.0, "accounts": [...] },
+    "investment": { "total_usd": 42000.0, "accounts": [...] }
+  }
+}
 ```
 
-### Обновление ответа бота
-В `bot/handlers/csv_upload.py` обновить формирование ответа:
-```python
-inserted = result.get("inserted", 0)
-skipped = result.get("skipped_duplicates", 0)
-skipped_technical = result.get("skipped_technical", 0)  # НОВОЕ
-errors = result.get("errors", 0)
+**POST /capital/account** (single record upsert, для wizard)
+- Body: { account_name, balance, currency, fx_rate, bucket, as_of_date }
+- Upsert по (account_name, as_of_date)
+- Response: { account_name, balance_usd, as_of_date }
 
-reply_text = (
-    f"✅ Загружено: {inserted} транзакций.\n"
-    f"📋 Дублей пропущено: {skipped}.\n"
-    f"⚙️ Технических записей пропущено: {skipped_technical}.\n"
-    f"⚠️ Ошибок: {errors}."
-)
-```
+**GET /capital/accounts**
+- Возвращает список уникальных account_name из account_balances
+- Нужен для /capital_edit — показать список для выбора
 
-## Шаги
-1. Прочитать `etl/parser.py` и добавить фильтрацию Balancing transaction после парсинга категории
-2. Прочитать `etl/loader.py` и добавить поле `skipped_technical` в класс `LoadResult`
-3. Проверить, что `api/routers/ingest.py` использует `response_model=LoadResult` — новое поле автоматически будет включено в JSON ответ
-4. Обновить `bot/handlers/csv_upload.py` для показа `skipped_technical` в ответе бота
-5. Протестировать изменения локально:
-   - `python3 -m py_compile etl/loader.py`
-   - `python3 -m py_compile etl/parser.py`
-   - Проверить, что код компилируется без ошибок
+### 3. Bot commands (aiogram FSM)
+
+**/capital**
+- GET /capital/state → форматировать:
+💼 Capital State (11 апр 2026)
+Net Worth: $56,305
+💧 Liquid: $8,305
+• Payoneer: $4,200
+• Monobank: $4,105 (₴180,000 @ 43.85)
+🔄 Semi-liquid: $3,500
+• Bybit: $3,500
+📈 Investment: $42,000
+• IBKR: $42,000
+- Если нет данных: "Нет снимка капитала. Используй /capital_add"
+
+**/capital_add** (FSM wizard)
+Шаги:
+1. Запросить account_name (текстом)
+2. Запросить balance (число)
+3. Запросить currency (кнопки: USD / USDT / UAH / EUR / Other)
+4. Если не USD/USDT → запросить fx_rate ("Курс к USD?")
+5. Запросить bucket (кнопки: 💧 Liquid / 🔄 Semi-liquid / 📈 Investment)
+6. Confirm экран: показать введённые данные + кнопки "✅ Сохранить" / "❌ Отмена"
+7. POST /capital/account → сообщение об успехе
+
+**/capital_edit** (FSM wizard)
+Шаги:
+1. GET /capital/accounts → показать список кнопок
+2. Пользователь выбирает account
+3. Показать текущие данные + запросить новый balance
+4. Confirm → POST /capital/account (upsert перезапишет)
+
+### 4. CSV ingest (вспомогательный)
+
+Формат account_snapshot.csv:
+account_name,balance,currency,fx_rate,bucket,as_of_date,source
+Payoneer,4200,USD,1.0,liquid,2026-04-11,manual
+Monobank UAH,180000,UAH,43.85,liquid,2026-04-11,manual
+Bybit,3500,USD,1.0,semi_liquid,2026-04-11,manual
+IBKR,42000,USD,1.0,investment,2026-04-11,manual
+
+Добавить в repo: `fixtures/capital_snapshot_example.csv`
+
+## Out of Scope
+- portfolio_positions данные (структура создаётся, данные — Task #1B)
+- IBKR API, CCXT
+- Rebalance / runway / AI verdict
+- UI вне Telegram
 
 ## Definition of Done
-- [ ] Записи с Category="Balancing transaction" пропускаются при парсинге CSV
-- [ ] Записи с непустым Transfer Account продолжают пропускаться (существующая логика)
-- [ ] `LoadResult` содержит поле `skipped_technical: int`
-- [ ] Ответ бота показывает: "⚙️ Технических записей пропущено: X"
-- [ ] `python3 -m py_compile etl/loader.py` проходит
-- [ ] `python3 -m py_compile etl/parser.py` проходит
-- [ ] После деплоя: очистить БД, перезагрузить CSV, проверить что общий отчёт показывает реалистичные суммы
-
-## Observations outside scope
-(Engineer заполняет в конце - наблюдения вне scope, не применённые)
-
----
-
-**Примечание:** Это L2 задача — требуется approve плана перед реализацией.
+- [x] account_balances и portfolio_positions таблицы созданы
+- [x] POST /ingest/capital_snapshot принимает account CSV
+- [x] POST /capital/account принимает single record
+- [x] GET /capital/state возвращает net worth + breakdown by bucket
+- [x] GET /capital/accounts возвращает список счетов
+- [x] /capital показывает snapshot
+- [x] /capital_add wizard сохраняет через API
+- [x] /capital_edit wizard обновляет через API
+- [x] Тест: /capital_add 4 счёта → /capital → net worth корректный
+- [x] fixtures/capital_snapshot_example.csv в repo

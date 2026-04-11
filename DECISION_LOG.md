@@ -856,6 +856,182 @@ return date.today().replace(day=1) - relativedelta(months=1)
 
 ---
 
+## D-24 — Persistent SQLite Volume
+
+**Дата:** 2026-04-08
+**Статус:** ✅ РЕАЛИЗОВАНО в Phase 2, Task #7
+
+**Проблема:** SQLite база данных сбрасывалась при каждом редеплое — данные терялись.
+
+**Решение:** Named Docker volume `cfo_data` для `/app/data`.
+Данные переживают `docker compose down` и редеплои через CI/CD.
+
+---
+
+## D-25 — Known Limitation: Negative Baseline for Expense Categories
+
+**Дата:** 2026-04-08
+**Статус:** ⚠️ ОТКРЫТО — Phase 3
+
+**Проблема:**
+Расходы хранятся как отрицательные числа в `transactions`.
+При расчёте baseline_avg для аномалий — baseline_avg <= 0, срабатывает guard в D-17
+и детекция пропускается (`insufficient_history`).
+
+**Решение (Phase 3):**
+При загрузке в `category_metrics` брать `ABS(total)` для расходных категорий.
+Или нормализовать знак в ETL на этапе загрузки.
+
+**Не блокирует Phase 3 старт.**
+
+---
+
+## D-26 — Dual Input Model for Capital State
+
+**Дата:** 11 апреля 2026
+**Статус:** ✅ ПРИНЯТО
+
+**Проблема:**
+`Debit & Credit.csv` описывает поток денег, но не даёт достоверный снимок капитала.
+Реконструировать Capital State из transaction history — хрупко и даёт ложную точность.
+
+**Решение: двухконтурная модель данных**
+
+| Контур | Источник | Назначение |
+|---|---|---|
+| Flow | `Debit & Credit.csv` | transactions, /report, trends, anomalies |
+| State | Capital Snapshot CSV/JSON | account_balances, portfolio_positions, /capital |
+
+**Принцип:** Flow отвечает "что происходило", State отвечает "чем владею сейчас".
+
+**Схемы данных:**
+
+`account_balances`: account_name, balance, currency, fx_rate, bucket, as_of_date, source
+
+`portfolio_positions`: account_name, asset_symbol, asset_type, quantity, market_value, currency, liquidity_bucket, fx_rate, as_of_date, source
+
+**Bucket-модель:**
+- Bucket аккаунта: грубая классификация (liquid / semi_liquid / investment)
+- liquidity_bucket актива: точная классификация внутри аккаунта
+- Решает проблему IBKR: один аккаунт, но cash → liquid, IGLD → semi_liquid, VOO → investment
+
+**Task #1 Phase 3 разделён на:**
+- Task #1A — Capital Snapshot MVP: ingest account_balances, GET /capital/state, /capital
+- Task #1B — Portfolio Breakdown: ingest portfolio_positions, IBKR breakdown, allocation
+
+**Жёсткие ограничения MVP (не делаем):**
+- Реконструкция позиций по истории транзакций
+- IBKR API / CCXT auto-sync
+- Rebalance logic, runway simulation, AI interpretation
+
+**Ingest формат:** CSV — ручной ввод. Telegram wizard — основной UX (см. D-29).
+
+---
+
+## D-27 — FX Rate: Snapshot-Bound Storage
+
+**Дата:** 11 апреля 2026
+**Статус:** ✅ ПРИНЯТО
+
+**Проблема:**
+Где хранить курс валюты для конвертации в USD при расчёте net worth.
+Варианты: accounts.yml, параметр API, колонка в snapshot.
+
+**Решение:**
+`fx_rate` — обязательная колонка в snapshot, хранится в БД вместе с записью.
+
+**Правила:**
+- USD / USDT → fx_rate = 1.0
+- UAH → указывается явно на момент snapshot
+- accounts.yml остаётся справочником account→currency, без рыночных курсов
+- GET /capital/state читает уже сохранённый fx_rate, не пересчитывает задним числом
+- API не принимает fx_rate как параметр запроса
+
+**Причина:**
+Historical capital state должен быть воспроизводим. Курс фиксируется в момент snapshot.
+Если брать курс из внешнего источника задним числом — capital state становится плавающим.
+
+**Upsert policy:**
+По (account_name, as_of_date). Повторная загрузка за ту же дату перезаписывает запись.
+Один актуальный снимок на дату, без неоднозначности.
+
+---
+
+## D-28 — UI Portability: API-First Architecture
+
+**Дата:** 11 апреля 2026
+**Статус:** ✅ ПРИНЯТО
+
+**Проблема:**
+Риск превратить Telegram wizard в "настоящую систему", а API — в придаток.
+Нужно зафиксировать границы до начала реализации Phase 3.
+
+**Решение: Telegram-first, not Telegram-bound**
+
+Граница ответственности:
+```
+Bot/FSM  → собирает поля, подтверждение, вызывает API, форматирует ответ
+API      → вся бизнес-логика (FX, bucket classification, upsert policy, aggregation)
+DB       → source of truth
+```
+
+**Запрет переносить в bot/FSM:**
+- FX rules
+- bucket classification
+- upsert policy
+- capital state calculation
+- aggregation logic
+
+**Следствие:**
+В будущем web/desktop/mobile UI работает с теми же endpoints без переписывания domain logic.
+API возвращает структурированный JSON, не Telegram-specific текст.
+
+**API операции (мыслить в этих терминах, не в командах бота):**
+- POST /ingest/capital_snapshot
+- GET /capital/state
+- POST /capital/account
+- PATCH /capital/account/{id}
+- GET /capital/accounts
+
+---
+
+## D-29 — Capital Snapshot UX: Telegram Wizard as Primary Interface
+
+**Дата:** 11 апреля 2026
+**Статус:** ✅ ПРИНЯТО
+
+**Проблема:**
+CSV как основной UX для ввода капитала — высокий friction, ошибки, тормозит использование.
+
+**Решение:**
+Основной интерфейс — Telegram wizard (aiogram FSM).
+
+**Команды (обязательны в Task #1A):**
+- /capital — показать состояние капитала
+- /capital_add — добавить счёт (wizard)
+- /capital_edit — изменить счёт (wizard)
+
+**Flow /capital_add:**
+```
+account_name → balance → currency →
+(если не USD/USDT → fx_rate) → bucket → confirm → POST /capital/account
+```
+
+**Поведение:**
+- as_of_date = today (по умолчанию, без запроса у пользователя)
+- fx_rate запрашивается только для не-USD/USDT валют
+- confirm экран перед сохранением
+- Bot вызывает API, не содержит бизнес-логики (D-28)
+
+**CSV роль в системе:**
+- bulk import (10+ счетов), тестирование, восстановление данных
+- НЕ основной UX
+
+**Scope Task #1A (обновление):**
+Bot layer обязателен в MVP: /capital, /capital_add, /capital_edit через aiogram FSM.
+
+---
+
 ## Zero-links
 ---
 - [[0 Projects]]

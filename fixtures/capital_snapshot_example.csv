@@ -1,0 +1,9 @@
+account_name,balance,currency,fx_rate,bucket,as_of_date,source
+Payoneer,4200,USD,1.0,liquid,2026-04-11,manual
+Monobank UAH,180000,UAH,43.85,liquid,2026-04-11,manual
+Bybit,3500,USD,1.0,semi_liquid,2026-04-11,manual
+IBKR,42000,USD,1.0,investment,2026-04-11,manual
+Revolut EUR,2500,EUR,0.92,liquid,2026-04-11,manual
+Wise GBP,1500,GBP,0.79,semi_liquid,2026-04-11,manual
+Binance USDT,8000,USDT,1.0,liquid,2026-04-11,manual
+Interactive Brokers Stocks,12500,USD,1.0,investment,2026-04-11,manual

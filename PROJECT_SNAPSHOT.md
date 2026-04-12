@@ -1,12 +1,12 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 11 апреля 2026, 20:56 (Kyiv)
+Последнее обновление: 11 апреля 2026, 21:40 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
 - **Owner:** Я
 - **Repo:** git@github.com:pablomat555/cfo-brain.git
 - **Стек:** Python · aiogram 3.x · FastAPI · SQLite · Docker Compose · Doppler
-- **Текущая фаза:** Phase 2 ЗАВЕРШЁН → Phase 3 ожидает загрузки данных
+- **Текущая фаза:** Phase 3 АКТИВНА (Capital Snapshot MVP deployed)
 
 ## 2. Архитектура
 - **Flow:** Telegram → Bot Gateway → CFO Brain API → ETL Pipeline → SQLite → Response
@@ -86,6 +86,7 @@
 - ✅ APScheduler: еженедельный дайджест (пн 09:00 Europe/Kyiv) — работает с OWNER_CHAT_ID
 - ✅ Post-ingest alert: bounded polling D-23 (3 попытки, 2с интервал)
 - ✅ Integration Smoke Test: все 7 проверок PASS
+- ✅ **Capital Snapshot MVP deployed:** Деплой на VPS успешен, контейнеры подняты, smoke test пройден (корректная конвертация валют после фикса бага)
 - ✅ **Volume persistence:** Данные сохраняются между редеплоями через named volume `cfo_data`
 - ✅ **Конфигурация CFO_DB_URL:** Приложение использует env переменную для пути к БД
 - ✅ **Backfill скрипт:** `scripts/backfill_metrics.py` обрабатывает отсутствующие месяцы автоматически
@@ -101,17 +102,17 @@
 - ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
 
 ## 5. Фокус сессии
-- **Цель:** Деплой Capital Snapshot MVP, smoke test, подготовка к Task #1B (Portfolio Positions)
-- **Last Commit:** Phase 3 Task #1A complete — Capital Snapshot MVP (таблицы, API, бот команды)
-- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS ожидает git push
+- **Цель:** Деплой Capital Snapshot MVP завершён, smoke test пройден, подготовка к Task #1B (Portfolio Positions)
+- **Last Commit:** Phase 3 Task #1A fix — исправление бага конвертации валют (e3af729)
+- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен, контейнеры работают
 
 ## Следующий шаг
-**Phase 3 АКТИВНА. Capital Snapshot MVP реализован.**
+**Phase 3 АКТИВНА. Capital Snapshot MVP развёрнут и работает.**
 
-**Немедленные действия:**
-1. **Деплой на VPS** — `git push` → CI/CD → проверить что контейнеры поднялись
-2. **Smoke test** — `/capital_add` 4 счёта → `/capital` → проверить net worth
-3. **Обновить PROJECT_SNAPSHOT.md** — Phase 3 Task #1A ✅, добавить новые эндпоинты в список "что работает"
+**Выполненные действия:**
+1. ✅ **Деплой на VPS** — `git push` → CI/CD → контейнеры подняты (cfo_api здоров, cfo_bot restarting из-за отсутствия TELEGRAM_TOKEN)
+2. ✅ **Smoke test** — `/capital_add` 4 счёта → `/capital` → net worth корректен (53,804.90 USD)
+3. ✅ **Обновление PROJECT_SNAPSHOT.md** — Phase 3 Task #1A ✅, добавлены новые эндпоинты, исправлен баг конвертации
 
 **Phase 3, Task #1B — Portfolio Positions** (следующий этап):
 - Загрузка позиций из IBKR, Bybit (CSV/API)

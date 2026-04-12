@@ -64,10 +64,24 @@ def parse_capital_snapshot_csv(csv_content: str, snapshot_type: str) -> List[Dic
                     
                 else:
                     # Обрабатываем portfolio snapshot (структура для Task #1B)
-                    # Пока просто сохраняем все поля
-                    for key, value in row.items():
-                        if value:
-                            normalized_row[key.strip()] = value.strip()
+                    # Обязательные поля: account_name, asset_symbol, quantity, market_value, currency, as_of_date
+                    required_fields = ["account_name", "asset_symbol", "quantity", "market_value", "currency", "as_of_date"]
+                    
+                    for field in required_fields:
+                        if field not in row:
+                            raise ValueError(f"Missing required field: {field}")
+                    
+                    # Нормализуем значения
+                    normalized_row["account_name"] = str(row["account_name"]).strip()
+                    normalized_row["asset_symbol"] = str(row["asset_symbol"]).strip().upper()
+                    normalized_row["quantity"] = float(row["quantity"])
+                    normalized_row["market_value"] = float(row["market_value"])
+                    normalized_row["currency"] = str(row["currency"]).strip().upper()
+                    normalized_row["as_of_date"] = str(row["as_of_date"]).strip()
+                    
+                    # Опциональные поля
+                    normalized_row["fx_rate"] = float(row.get("fx_rate", 1.0))
+                    normalized_row["source"] = str(row.get("source", "csv")).strip().lower()
                 
                 parsed_data.append(normalized_row)
                 

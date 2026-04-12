@@ -1,0 +1,10 @@
+account_name,asset_symbol,quantity,market_value,currency,fx_rate,as_of_date,source
+IBKR,VOO,10,4500,USD,1.0,2026-04-12,csv
+IBKR,QQQ,5,2200,USD,1.0,2026-04-12,csv
+IBKR,SGOV,100,10100,USD,1.0,2026-04-12,csv
+Bybit,BTC,0.5,35000,USD,1.0,2026-04-12,csv
+Bybit,ETH,2,8000,USD,1.0,2026-04-12,csv
+Trust Wallet,USDT,5000,5000,USD,1.0,2026-04-12,csv
+Loans,LOAN-USD,1000,1000,USD,1.0,2026-04-12,csv
+Loans,LOAN-UAH,1009,1009,UAH,43.85,2026-04-12,csv
+Steam,STEAM,50,50,USD,1.0,2026-04-12,csv

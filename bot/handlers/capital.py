@@ -33,6 +33,26 @@ class CapitalEditStates(StatesGroup):
     confirm = State()
 
 
+# FSM States для /position_add
+class PositionAddStates(StatesGroup):
+    account_name = State()
+    asset_symbol = State()
+    quantity = State()
+    market_value = State()
+    currency = State()
+    fx_rate = State()
+    as_of_date = State()
+    confirm = State()
+
+
+# FSM States для /position_edit
+class PositionEditStates(StatesGroup):
+    select_position = State()
+    new_quantity = State()
+    new_market_value = State()
+    confirm = State()
+
+
 # Вспомогательные функции
 async def call_api(endpoint: str, method: str = "GET", json_data: Dict[str, Any] = None) -> Dict[str, Any]:
     """Вызов API эндпоинта"""
@@ -500,4 +520,248 @@ async def command_cancel(message: Message, state: FSMContext):
     await message.answer(
         "Процесс отменён.",
         reply_markup=ReplyKeyboardRemove()
+    )
+
+
+# ============================================
+# Команды для работы с позициями портфеля
+# ============================================
+
+@router.message(Command("positions"))
+async def command_positions(message: Message):
+    """Показать список позиций портфеля"""
+    try:
+        response = await call_api("/capital/positions", method="GET")
+        positions = response.get("positions", [])
+        
+        if not positions:
+            await message.answer("📭 Нет позиций портфеля. Добавьте первую через /position_add")
+            return
+        
+        # Группируем по дате
+        by_date = {}
+        for pos in positions:
+            as_of_date = pos["as_of_date"]
+            if as_of_date not in by_date:
+                by_date[as_of_date] = []
+            by_date[as_of_date].append(pos)
+        
+        # Формируем сообщение
+        lines = ["📊 *Позиции портфеля*"]
+        for date_str, pos_list in sorted(by_date.items(), reverse=True):
+            lines.append(f"\n*{date_str}*")
+            total_usd = sum(p["market_value_usd"] for p in pos_list)
+            lines.append(f"Всего: ${total_usd:,.2f}")
+            for pos in pos_list:
+                lines.append(
+                    f"• {pos['account_name']} – {pos['asset_symbol']}: "
+                    f"{pos['quantity']} × ${pos['market_value_usd']/pos['quantity']:,.2f} = "
+                    f"${pos['market_value_usd']:,.2f} ({pos['asset_type']})"
+                )
+        
+        await message.answer("\n".join(lines), parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error fetching positions: {e}")
+        await message.answer(f"❌ Ошибка при получении позиций: {str(e)}")
+
+
+@router.message(Command("position_add"))
+async def command_position_add(message: Message, state: FSMContext):
+    """Начать добавление позиции портфеля"""
+    await message.answer(
+        "📝 *Добавление позиции портфеля*\n\n"
+        "Введите название счёта (например, IBKR, Bybit, Trust Wallet):",
+        parse_mode="Markdown"
+    )
+    await state.set_state(PositionAddStates.account_name)
+
+
+@router.message(PositionAddStates.account_name)
+async def process_position_account_name(message: Message, state: FSMContext):
+    await state.update_data(account_name=message.text.strip())
+    await message.answer("Введите символ актива (например, BTC, USDT, VOO):")
+    await state.set_state(PositionAddStates.asset_symbol)
+
+
+@router.message(PositionAddStates.asset_symbol)
+async def process_position_asset_symbol(message: Message, state: FSMContext):
+    await state.update_data(asset_symbol=message.text.strip().upper())
+    await message.answer("Введите количество (например, 0.5):")
+    await state.set_state(PositionAddStates.quantity)
+
+
+@router.message(PositionAddStates.quantity)
+async def process_position_quantity(message: Message, state: FSMContext):
+    try:
+        quantity = float(message.text.replace(",", "."))
+        if quantity <= 0:
+            await message.answer("Количество должно быть положительным. Введите снова:")
+            return
+        await state.update_data(quantity=quantity)
+        await message.answer("Введите рыночную стоимость (в валюте актива):")
+        await state.set_state(PositionAddStates.market_value)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное число:")
+
+
+@router.message(PositionAddStates.market_value)
+async def process_position_market_value(message: Message, state: FSMContext):
+    try:
+        market_value = float(message.text.replace(",", "."))
+        if market_value <= 0:
+            await message.answer("Стоимость должна быть положительной. Введите снова:")
+            return
+        await state.update_data(market_value=market_value)
+        
+        # Предлагаем валюту кнопками
+        keyboard = InlineKeyboardBuilder()
+        for currency in ["USD", "USDT", "UAH", "EUR", "Other"]:
+            keyboard.button(text=currency, callback_data=f"currency_{currency}")
+        keyboard.adjust(3)
+        
+        await message.answer(
+            "Выберите валюту актива:",
+            reply_markup=keyboard.as_markup()
+        )
+        await state.set_state(PositionAddStates.currency)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное число:")
+
+
+@router.callback_query(PositionAddStates.currency, F.data.startswith("currency_"))
+async def process_position_currency(callback_query, state: FSMContext):
+    currency = callback_query.data.replace("currency_", "")
+    await state.update_data(currency=currency)
+    
+    if currency in ["USD", "USDT"]:
+        await state.update_data(fx_rate=1.0)
+        await callback_query.message.edit_text(
+            f"Валюта: {currency}. Курс к USD = 1.0"
+        )
+        await state.set_state(PositionAddStates.as_of_date)
+        await callback_query.answer()
+        await callback_query.message.answer(
+            "Введите дату позиции (YYYY-MM-DD) или нажмите /skip для сегодняшней:"
+        )
+    else:
+        await callback_query.message.edit_text(
+            f"Валюта: {currency}. Введите курс к USD (например, 43.85 для UAH):"
+        )
+        await state.set_state(PositionAddStates.fx_rate)
+        await callback_query.answer()
+
+
+@router.message(PositionAddStates.fx_rate)
+async def process_position_fx_rate(message: Message, state: FSMContext):
+    try:
+        fx_rate = float(message.text.replace(",", "."))
+        if fx_rate <= 0:
+            await message.answer("Курс должен быть положительным. Введите снова:")
+            return
+        await state.update_data(fx_rate=fx_rate)
+        await message.answer(
+            "Введите дату позиции (YYYY-MM-DD) или нажмите /skip для сегодняшней:"
+        )
+        await state.set_state(PositionAddStates.as_of_date)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное число:")
+
+
+@router.message(PositionAddStates.as_of_date)
+async def process_position_as_of_date(message: Message, state: FSMContext):
+    if message.text == "/skip":
+        as_of_date = date.today().isoformat()
+    else:
+        try:
+            datetime.strptime(message.text, "%Y-%m-%d")
+            as_of_date = message.text
+        except ValueError:
+            await message.answer("Неверный формат даты. Используйте YYYY-MM-DD:")
+            return
+    
+    await state.update_data(as_of_date=as_of_date)
+    
+    # Показать подтверждение
+    data = await state.get_data()
+    confirm_text = (
+        f"*Подтвердите добавление позиции:*\n\n"
+        f"• *Счёт:* {data['account_name']}\n"
+        f"• *Актив:* {data['asset_symbol']}\n"
+        f"• *Количество:* {data['quantity']}\n"
+        f"• *Стоимость:* {data['market_value']} {data['currency']}\n"
+        f"• *Курс к USD:* {data.get('fx_rate', 1.0)}\n"
+        f"• *Дата:* {data['as_of_date']}\n\n"
+        f"Сохранить позицию?"
+    )
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text="✅ Сохранить", callback_data="position_confirm_save")
+    keyboard.button(text="❌ Отмена", callback_data="position_confirm_cancel")
+    keyboard.adjust(2)
+    
+    await message.answer(
+        confirm_text,
+        parse_mode="Markdown",
+        reply_markup=keyboard.as_markup()
+    )
+    await state.set_state(PositionAddStates.confirm)
+
+
+@router.callback_query(PositionAddStates.confirm, F.data.in_(["position_confirm_save", "position_confirm_cancel"]))
+async def process_position_confirm(callback_query, state: FSMContext):
+    if callback_query.data == "position_confirm_cancel":
+        await callback_query.message.edit_text("❌ Добавление позиции отменено.")
+        await state.clear()
+        await callback_query.answer()
+        return
+    
+    data = await state.get_data()
+    
+    # Формируем запрос к API
+    position_data = {
+        "account_name": data["account_name"],
+        "asset_symbol": data["asset_symbol"],
+        "quantity": data["quantity"],
+        "market_value": data["market_value"],
+        "currency": data["currency"],
+        "fx_rate": data.get("fx_rate", 1.0),
+        "as_of_date": data["as_of_date"],
+        "source": "manual"
+    }
+    
+    try:
+        response = await call_api("/capital/position", method="POST", json_data=position_data)
+        
+        success_text = (
+            f"✅ *Позиция добавлена!*\n\n"
+            f"• {response['account_name']} – {response['asset_symbol']}\n"
+            f"• Тип: {response['asset_type']}\n"
+            f"• Ликвидность: {response['liquidity_bucket']}\n"
+            f"• Стоимость в USD: ${response['market_value_usd']:,.2f}\n\n"
+            f"Используй /positions чтобы увидеть все позиции."
+        )
+        
+        await callback_query.message.edit_text(
+            success_text,
+            parse_mode="Markdown"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error adding position via API: {e}")
+        await callback_query.message.edit_text(
+            f"❌ Ошибка при сохранении: {str(e)}"
+        )
+    
+    await state.clear()
+    await callback_query.answer()
+
+
+# Команда /position_edit (упрощённая версия — требует доработки)
+@router.message(Command("position_edit"))
+async def command_position_edit(message: Message):
+    """Редактирование позиции (заглушка)"""
+    await message.answer(
+        "Редактирование позиций пока не реализовано. "
+        "Используйте /positions чтобы увидеть список, затем удалите и добавьте заново."
     )

@@ -1,5 +1,5 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 11 апреля 2026, 20:56 (Kyiv)
+Последнее обновление: 11 апреля 2026, 21:40 (Kyiv)
 
 ## Phase Transition: Phase 2 → Phase 3
 **Дата:** 10 апреля 2026
@@ -85,6 +85,57 @@
 ### Следующий шаг:
 - **Деплой на VPS** — `git push` → CI/CD → smoke test
 - **Task #1B** — Portfolio Positions (загрузка позиций из IBKR, Bybit)
+
+---
+
+## Сессия: Phase 3, Task #1A — Fix FX Conversion Bug & Smoke Test
+**Дата:** 11 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- **Цель:** Исправить критический баг конвертации валют в Capital Snapshot MVP и провести smoke test после деплоя на VPS.
+- **Проблема:** Логика конвертации инвертирована: `balance_usd = balance * fx_rate` вместо `balance / fx_rate`. Это приводило к завышению net worth в 150 раз (7.9M USD вместо 53K USD).
+- **Задача:** L1 (простая) — изменение одной строки в одном файле.
+- **Фаза:** Phase 3 — СТРАТЕГ (последеплойный фикс).
+
+### Выполненные работы
+1. **Анализ бага:**
+   - Smoke test выявил нереалистичный net worth (7,942,700 USD).
+   - Проверка логики в [`api/routers/capital.py`](api/routers/capital.py): умножение вместо деления.
+   - `fx_rate` определён как курс UAH/USD (сколько UAH в одном USD). Конвертация: `balance_usd = balance / fx_rate`.
+
+2. **Исправление в [`api/routers/capital.py`](api/routers/capital.py):**
+   - Строка 65: `balance_usd = account.balance * account.fx_rate` → `balance_usd = account.balance / account.fx_rate if account.fx_rate != 0 else 0.0`
+   - Строка 133: аналогичное исправление для consistency.
+
+3. **Деплой фикса:**
+   - Коммит `e3af729` с сообщением "Fix FX conversion bug in capital snapshot".
+   - `git push` → автоматический запуск CI/CD (GitHub Actions).
+   - На VPS контейнеры пересобраны и перезапущены через `doppler run -- docker compose up -d --build`.
+
+4. **Smoke test после фикса:**
+   - Добавлены 4 счёта через `POST /capital/account` (Payoneer, Monobank UAH, Bybit, IBKR).
+   - Получено состояние капитала через `GET /capital/state`.
+   - **Результат:** Net worth корректен — 53,804.90 USD.
+     - Monobank UAH: 180,000 UAH / 43.85 = 4,104.90 USD (правильно).
+     - Payoneer: 4,200 USD.
+     - Bybit: 3,500 USD.
+     - IBKR: 42,000 USD.
+
+### Технические детали
+- **Локализация изменений:** Один файл, две строки.
+- **Обратная совместимость:** Для USD/USDT fx_rate = 1.0, деление на 1.0 не меняет сумму.
+- **Edge case:** Добавлена проверка на ноль для предотвращения ZeroDivisionError.
+
+### Результаты
+- ✅ Баг конвертации валют исправлен.
+- ✅ Smoke test пройден, net worth корректен.
+- ✅ Контейнеры на VPS обновлены и работают.
+- ✅ Capital Snapshot MVP готов к использованию.
+
+### Следующий шаг:
+- Переход к Task #1B — Portfolio Positions (загрузка позиций из IBKR, Bybit).
 
 ---
 

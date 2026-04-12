@@ -263,11 +263,55 @@ class AccountBalanceResponse(BaseModel):
         from_attributes = True
 
 
+class PortfolioPositionCreate(BaseModel):
+    """Pydantic модель для создания/обновления позиции портфеля"""
+    account_name: str
+    asset_symbol: str
+    quantity: float
+    market_value: float
+    currency: str
+    fx_rate: float = 1.0
+    as_of_date: str  # YYYY-MM-DD
+    source: str = "manual"
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class PortfolioPositionResponse(BaseModel):
+    """Pydantic модель для ответа API с позицией портфеля"""
+    id: int
+    account_name: str
+    asset_symbol: str
+    asset_type: str
+    quantity: float
+    market_value: float
+    currency: str
+    fx_rate: float
+    liquidity_bucket: str
+    as_of_date: str
+    source: str
+    created_at: str
+    market_value_usd: float  # вычисленное поле: market_value * fx_rate
+
+    class Config:
+        from_attributes = True
+
+
+class PortfolioPositionListResponse(BaseModel):
+    """Pydantic модель для ответа API со списком позиций"""
+    positions: List[PortfolioPositionResponse]
+
+
 class CapitalStateResponse(BaseModel):
     """Pydantic модель для ответа API с состоянием капитала"""
     as_of_date: str
     total_net_worth_usd: float
     by_bucket: Dict[str, Dict[str, Any]]
+    by_asset_type: Dict[str, Dict[str, Any]]
+    by_liquidity_bucket: Dict[str, Dict[str, Any]]
 
     class Config:
         json_encoders = {

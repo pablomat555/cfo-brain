@@ -67,7 +67,7 @@ def recalculate(month_key: str) -> None:
             category = tx.category or "Unknown"
             
             # Агрегируем по категории
-            category_totals[category] = category_totals.get(category, 0.0) + amount
+            category_totals[category] = category_totals.get(category, 0.0) + (abs(amount) if amount < 0 else amount)
             category_counts[category] = category_counts.get(category, 0) + 1
             
             # Разделяем доходы и расходы

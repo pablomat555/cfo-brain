@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 11 апреля 2026, 21:40 (Kyiv)
+Последнее обновление: 12 апреля 2026, 20:42 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -50,6 +50,7 @@
   - Phase 2, Task #8 ✅ ЗАВЕРШЁН (Fix ETL Rollback Bug)
   - Phase 2, Task #9 ✅ ЗАВЕРШЁН (Filter Balancing Transactions and Internal Transfers)
   - Phase 3, Task #1A ✅ ЗАВЕРШЁН (Capital Snapshot MVP — таблицы, API, бот команды)
+  - Phase 3, Task #1B ✅ ЗАВЕРШЁН (Portfolio Breakdown & Enhanced Capital State — Single Source Rule, asset classification, новые эндпоинты, бот команды)
   - **Дополнительные задачи Phase 2:**
     - ✅ **Volume persistence** — добавлен named volume `cfo_data` для `/app/data`
     - ✅ **Конфигурация CFO_DB_URL** — исправлено поле `cfo_db_url` для использования env переменной
@@ -62,8 +63,8 @@
 - ✅ Полная структура repo создана (20+ файлов)
 - ✅ ETL pipeline: парсинг CSV с non-breaking spaces, загрузка в SQLite с isolated transactions через `db.begin_nested()`
 - ✅ Фильтрация: Balancing transaction и переводы между счетами пропускаются
-- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period, GET /observer/anomalies, GET /observer/trends, POST /ingest/capital_snapshot, GET /capital/state, POST /capital/account, GET /capital/accounts
-- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends, /capital, /capital_add, /capital_edit и CSV файлов
+- ✅ API: FastAPI с эндпоинтами POST /ingest/csv, GET /health, GET /report/period, GET /observer/anomalies, GET /observer/trends, POST /capital/ingest/capital_snapshot, GET /capital/state, POST /capital/account, GET /capital/accounts, POST /capital/position, GET /capital/positions
+- ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends, /capital, /capital_add, /capital_edit, /position_add, /positions, /position_edit и CSV файлов
 - ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002) и named volume `cfo_data`
 - ✅ Doppler integration: переменные окружения инжектятся через environment (TELEGRAM_TOKEN, CFO_DB_URL, OWNER_CHAT_ID, OPENROUTER_API_KEY, LOG_LEVEL)
 - ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
@@ -93,6 +94,11 @@
 - ✅ **Фикс rollback бага:** Изолированные транзакции предотвращают потерю данных при дубликатах
 - ✅ **Валидатор OWNER_CHAT_ID:** Преобразование пустой строки в None предотвращает crash бота
 - ✅ **Фильтрация технических записей:** Balancing transaction и переводы пропускаются, отчёты показывают реалистичные суммы
+- ✅ **Portfolio Breakdown:** Single Source Rule (D-30) реализована — portfolio_positions приоритет над account_balances для одинакового account/date
+- ✅ **Asset Classification:** Классификатор `core/capital_classifier.py` маппит символы на asset_type и liquidity_bucket (хардкод)
+- ✅ **Enhanced Capital State:** GET /capital/state возвращает breakdown по asset_type и liquidity_bucket, включает illiquid bucket для Loans receivable (D-31)
+- ✅ **Portfolio Snapshot CSV:** Поддержка загрузки portfolio snapshot через POST /capital/ingest/capital_snapshot с автоматической классификацией
+- ✅ **Bot Commands:** Новые команды /position_add (FSM wizard), /positions (список позиций), /position_edit (stub)
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
@@ -100,30 +106,54 @@
 - ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
 - ⚠️ Rate type "skip" используется по умолчанию — аналитика с ним ограничена
 - ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
+- ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
+- ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
 
 ## 5. Фокус сессии
-- **Цель:** Деплой Capital Snapshot MVP завершён, smoke test пройден, подготовка к Task #1B (Portfolio Positions)
-- **Last Commit:** Phase 3 Task #1A fix — исправление бага конвертации валют (e3af729)
-- **Git Status:** Все изменения закоммичены и запушены, деплой на VPS выполнен, контейнеры работают
+- **Цель:** Task #1B завершён, smoke test пройден, готовность к Task #2 (Verdict Engine)
+- **Last Commit:** Phase 3 Task #1B — Portfolio Breakdown & Enhanced Capital State (7595621)
+- **Git Status:** Все изменения закоммичены и запушены, CI/CD деплой выполнен, контейнеры работают
 
 ## Следующий шаг
-**Phase 3 АКТИВНА. Capital Snapshot MVP развёрнут и работает.**
+**Phase 3 АКТИВНА. Task #1B развёрнут и работает.**
 
 **Выполненные действия:**
-1. ✅ **Деплой на VPS** — `git push` → CI/CD → контейнеры подняты (cfo_api здоров, cfo_bot restarting из-за отсутствия TELEGRAM_TOKEN)
-2. ✅ **Smoke test** — `/capital_add` 4 счёта → `/capital` → net worth корректен (53,804.90 USD)
-3. ✅ **Обновление PROJECT_SNAPSHOT.md** — Phase 3 Task #1A ✅, добавлены новые эндпоинты, исправлен баг конвертации
+1. ✅ **Деплой через CI/CD** — `git push` → GitHub Actions → VPS обновлён, контейнеры пересобраны
+2. ✅ **Smoke test** — миграция 004 применилась, portfolio snapshot загружен, GET /capital/state возвращает breakdown с illiquid bucket
+3. ✅ **Обновление PROJECT_SNAPSHOT.md** — Phase 3 Task #1B ✅, добавлены новые эндпоинты и команды бота
 
-**Phase 3, Task #1B — Portfolio Positions** (следующий этап):
-- Загрузка позиций из IBKR, Bybit (CSV/API)
-- Интеграция с таблицей portfolio_positions
-- Расчёт рыночной стоимости и ликвидности
+**Phase 3, Task #2 — Verdict Engine + Capital State (D-10)** (следующий этап):
+- Конфигурируемые правила классификации активов
+- Decision types: allocation, rebalance, risk alert
+- Интеграция с AI-анализом (OpenRouter)
+
+**Phase 3, Task #3 — Runway / Burn Rate симуляция**
+- Прогноз cash flow на основе исторических данных
+- Визуализация runway в месяцах
+
+**Phase 3, Task #4 — Backup стратегия SQLite**
+- Автоматический backup базы данных на S3/Backblaze
+- Восстановление через CLI
+
+**Phase 3, Task #5 — Фикс D-25 (отрицательные суммы в baseline)**
+- Исправление baseline calculation для expense categories
+- **Выполнено:** Изменён `analytics/metrics_service.py` — применён `abs()` для расходных транзакций в агрегации категорий
+- **Требуется:** backfill на VPS после деплоя изменений
+
+**Статус Phase 3:**
+✅ Task #1A — Capital Snapshot MVP
+✅ Task #1B — Portfolio Breakdown
+⏳ Task #2 — Verdict Engine + Capital State (D-10)
+⏳ Task #3 — Runway / Burn Rate симуляция
+⏳ Task #4 — Backup стратегия SQLite
+✅ Task #5 — Фикс D-25 (отрицательные суммы в baseline)
 
 **Known Issues для Phase 3:**
 - ⚠️ "Balancing transaction" фильтр добавлен но старые данные очищены — нужна перезагрузка
-- ⚠️ Invalid baseline для категорий с отрицательными суммами (D-25) — расходы хранятся как отрицательные числа
 - ⚠️ Backup стратегия для SQLite volume отсутствует
 - ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
+- ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
+- ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
 
 ### Что выполнено сверх Phase 1 DoD:
 - ✅ D-11 CI/CD — GitHub Actions работает, деплой на VPS автоматический

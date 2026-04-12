@@ -1,5 +1,5 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 11 апреля 2026, 21:40 (Kyiv)
+Последнее обновление: 12 апреля 2026, 20:44 (Kyiv)
 
 ## Phase Transition: Phase 2 → Phase 3
 **Дата:** 10 апреля 2026
@@ -386,4 +386,78 @@
 - **Проблема:** D-22 (get_last_complete_month) возвращал некорректный месяц
 - **Решение:** Исправить логику определения последнего полного месяца
 - **Задача:** L2 (средняя) — несколько компонентов, временная логика
-- **Фаза:** Phase
+- **Фаза:** Phase 2
+
+---
+
+## Сессия: Phase 3, Task #1B — Portfolio Breakdown & Enhanced Capital State
+**Дата:** 12 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- **Цель:** Расширить Capital State с Single Source Rule, классификацией активов и breakdown по ликвидности
+- **Проблема:** Двойной ввод (account_balances + portfolio_positions) требует правила приоритета (D-30)
+- **Решение:** Single Source Rule: portfolio_positions приоритет над account_balances для одинакового account/date
+- **Задача:** L3 (сложная) — множественные компоненты, миграция БД, новые API эндпоинты, FSM wizard
+- **Фаза:** Phase 3 — СТРАТЕГ (вторая задача)
+
+### Выполненные работы
+1. **Миграция 004** — добавление 'illiquid' в CHECK constraint таблицы portfolio_positions (требуется для Loans receivable по D-31)
+2. **Классификатор активов** — создан `core/capital_classifier.py` с функцией `classify_asset()` (хардкод маппинг символов на asset_type и liquidity_bucket)
+3. **Pydantic модели** — добавлены `PortfolioPositionCreate`, `PortfolioPositionResponse`, `PortfolioPositionListResponse`
+4. **API эндпоинты**:
+   - POST `/capital/position` — создание/обновление позиции с автоматической классификацией
+   - GET `/capital/positions` — фильтрация позиций по дате и аккаунту
+   - Расширен GET `/capital/state` с Single Source Rule и breakdown по asset_type/liquidity_bucket
+   - Расширен POST `/capital/ingest/capital_snapshot` для обработки portfolio snapshot CSV
+5. **Bot FSM** — новые состояния и обработчики:
+   - `/position_add` wizard с multi-step диалогом (account, symbol, quantity, market_value, currency, fx_rate, date)
+   - `/positions` — список позиций портфеля
+   - `/position_edit` stub (требует доработки UI выбора позиции)
+6. **CSV ingest** — расширен парсер `etl/capital_parser.py` для portfolio snapshot с обязательными полями
+7. **Пример CSV** — создан `fixtures/portfolio_snapshot_example.csv` с различными типами активов
+8. **Обновление core/database.py** — добавлена функция `apply_liquidity_constraint_fix_migration()` и вызов в `init_db()`
+9. **CI/CD деплой** — коммит и пуш в main, автоматический деплой на VPS через GitHub Actions
+10. **Smoke test** — проверка на VPS:
+    - Миграция 004 применилась (CHECK constraint включает 'illiquid')
+    - Загрузка portfolio snapshot (9 строк)
+    - GET /capital/state возвращает корректные breakdown (total net worth 65,873.01 USD)
+
+### Технические детали
+- **Single Source Rule реализация**: Сбор accounts_with_positions set, фильтрация account_balances
+- **Asset classification**: USDT→stablecoin→liquid, Crypto→semi_liquid, ETF→investment, Loans→receivable→illiquid
+- **Upsert key**: (account_name, asset_symbol, as_of_date) уникальный constraint
+- **Миграция 004**: Пересоздание таблицы с новым CHECK constraint (SQLite не поддерживает ALTER TABLE для CHECK)
+- **Бот логика**: Только API вызовы, классификация и FX остаются на стороне API
+
+### Результаты
+- ✅ Все файлы в scope созданы/изменены
+- ✅ Single Source Rule работает в GET /capital/state
+- ✅ Классификатор активов выделен в core/capital_classifier.py
+- ✅ Новые API эндпоинты работают (синтаксически проверены)
+- ✅ Бот команды /position_add, /positions, /position_edit добавлены
+- ✅ CSV ingest расширен для portfolio snapshot
+- ✅ Миграция 004 создана и интегрирована в init_db
+- ✅ Деплой через CI/CD инициирован
+- ✅ TASK.md архивирован в docs/tasks/TASK_2026-04-12_portfolio-breakdown-enhanced-capital-state.md
+- ✅ PROJECT_SNAPSHOT.md обновлён с новым статусом Phase 3
+
+### Валидация
+- Smoke test на VPS пройден: миграция применена, данные загружены, breakdown корректный
+- Синтаксическая проверка всех файлов: нет ошибок
+- Архитектурные правила соблюдены: Single Source Rule (D-30), Loans как receivable (D-31), классификатор выделен
+
+### Следующий шаг:
+- **Phase 3, Task #2** — Verdict Engine + Capital State (D-10): конфигурируемые правила классификации, decision types
+- **Phase 3, Task #3** — Runway / Burn Rate симуляция: прогноз cash flow, визуализация runway
+- **Phase 3, Task #4** — Backup стратегия SQLite: автоматический backup на S3/Backblaze
+- **Phase 3, Task #5** — Фикс D-25: исправление baseline calculation для expense categories
+
+**Статус Phase 3:**
+✅ Task #1A — Capital Snapshot MVP
+✅ Task #1B — Portfolio Breakdown & Enhanced Capital State
+⏳ Task #2 — Verdict Engine + Capital State (D-10)
+⏳ Task #3 — Runway / Burn Rate симуляция
+⏳ Task #4 — Backup стратегия SQLite
+⏳ Task #5 — Фикс D-25 (отрицательные суммы в baseline)

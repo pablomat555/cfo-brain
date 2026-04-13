@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from typing import Dict, List, Any
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -58,9 +59,56 @@ async def _run_observer(min_date, max_date):
         logger.error(f"Observer pipeline failed: {e}")
 
 
+@router.get("/csv/preview")
+async def preview_csv(
+    file: UploadFile = File(...)
+) -> Dict[str, Any]:
+    """
+    Предварительный анализ CSV файла без загрузки в БД.
+    
+    Возвращает информацию о валютах в файле для принятия решения о запросе курса.
+    """
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    logger.info(f"Preview CSV: {file.filename}")
+    
+    try:
+        # Читаем содержимое файла
+        content = await file.read()
+        
+        # Парсим CSV
+        rows = parse_csv(content, file.filename)
+        
+        # Собираем уникальные валюты
+        currencies = set()
+        has_uah = False
+        
+        for row in rows:
+            currencies.add(row.currency)
+            if row.currency == "UAH":
+                has_uah = True
+        
+        return {
+            "has_uah": has_uah,
+            "currencies": list(currencies),
+            "transaction_count": len(rows),
+            "date_range": {
+                "min": min(row.date for row in rows).isoformat() if rows else None,
+                "max": max(row.date for row in rows).isoformat() if rows else None
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error previewing CSV {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @router.post("/csv", response_model=LoadResult)
 async def ingest_csv(
     file: UploadFile = File(...),
+    fx_rate: float = Query(0.0, description="Курс UAH/USD для конвертации"),
+    rate_type: str = Query("skip", description="Тип курса: 'manual' или 'skip'"),
     db: Session = Depends(get_db)
 ) -> LoadResult:
     """
@@ -71,7 +119,7 @@ async def ingest_csv(
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
     
-    logger.info(f"Processing CSV upload: {file.filename}")
+    logger.info(f"Processing CSV upload: {file.filename}, fx_rate={fx_rate}, rate_type={rate_type}")
     
     try:
         # Читаем содержимое файла
@@ -83,7 +131,7 @@ async def ingest_csv(
             return LoadResult(inserted=0, skipped_duplicates=0, errors=0, detection_status="pending")
         
         # Загружаем в БД
-        result = load_transactions(rows, db, source_file=file.filename)
+        result = load_transactions(rows, db, source_file=file.filename, fx_rate=fx_rate, rate_type=rate_type)
         
         # Определяем min_date и max_date из загруженных транзакций
         if rows:

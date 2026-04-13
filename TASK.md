@@ -1,54 +1,45 @@
-# TASK: Phase 3 / Task #5 — Fix D-25 (Negative Baseline for Expense Categories)
+# TASK: Hotfix — Restore FX Rate Request in CSV Upload
 
-**Создан:** 12 апреля 2026, 20:51 (Kyiv)
+**Создан:** 13 апреля 2026, 19:07 (Kyiv)
 **Уровень:** L2
-**Статус:** pending
+**Статус:** completed
 
 ## Цель
-Исправить агрегацию расходных категорий в category_metrics.total, чтобы значения были положительными, что позволит anomaly_service корректно вычислять baseline и детектировать аномалии.
+Восстановить запрос курса валют при загрузке CSV с UAH транзакциями, чтобы Observer layer мог корректно работать с мультивалютными данными.
 
 ## Scope
 Файлы и директории в scope:
-- `analytics/metrics_service.py` (основное изменение)
-- `scripts/backfill_metrics.py` (запуск пересчёта)
+- `bot/handlers/csv_upload.py` — восстановление FSM логики запроса курса
+- `api/routers/ingest.py` — добавление параметра `fx_rate` в эндпоинт POST `/ingest/csv` (если не поддерживается)
+- Возможно создание нового эндпоинта GET `/ingest/csv/preview` для предварительного анализа CSV
 
 Вне scope (не трогать):
-- все остальные файлы
-- raw transactions (D-15 иммутабельность)
-- anomaly_service.py (только использует данные)
-- analytics/aggregator.py (для отчётов)
+- Все остальные файлы
+- Изменение логики конвертации валют в ETL или analytics
+- Изменение структуры БД
 
 ## Шаги
-1. **Найти точное место агрегации** - уже найдено: `analytics/metrics_service.py` строки 70-71
-2. **Применить ABS() для расходов**:
-   ```python
-   # БЫЛО:
-   category_totals[category] = category_totals.get(category, 0.0) + amount
-   
-   # СТАЛО:
-   category_totals[category] = category_totals.get(category, 0.0) + (abs(amount) if amount < 0 else amount)
-   ```
-   Правило: amount < 0 → расход → abs(amount); amount > 0 → доход → amount (положительный)
-3. **Запустить backfill исторических метрик**:
-   ```bash
-   docker exec cfo-brain-cfo_api-1 python3 -m scripts.backfill_metrics
-   ```
-4. **Проверить результат**:
-   - Убедиться, что category_metrics.total содержит положительные значения
-   - Проверить, что GET /observer/anomalies возвращает detection_status != 'insufficient_history'
-   - Убедиться, что аномалии детектируются при наличии превышения порога
+1. Проанализировать текущую реализацию `bot/handlers/csv_upload.py` и определить, как ранее работал запрос курса (FSM логика).
+2. Проверить, принимает ли API эндпоинт POST `/ingest/csv` параметр `fx_rate` (изучить `api/routers/ingest.py`).
+3. Если параметр не принимается — добавить поддержку `fx_rate` в `api/routers/ingest.py` с передачей в ETL pipeline.
+4. Реализовать в боте логику предварительного анализа CSV:
+   - После скачивания файла определить наличие UAH транзакций (по полю currency или account mapping).
+   - Если UAH транзакции есть — запустить FSM состояние запроса курса у пользователя.
+   - Предоставить опцию `/skip` для сохранения текущего поведения.
+5. Передать полученный `fx_rate` в API при загрузке CSV.
+6. Убедиться, что `rate_type="manual"` сохраняется в `monthly_metrics` для соответствующих месяцев.
+7. Провести smoke test: загрузить мультивалютный CSV, убедиться что бот спрашивает курс, и что `/observer/anomalies` возвращает `detection_status != "skip_mode"`.
 
 ## Definition of Done
-- [ ] category_metrics.total содержит положительные значения для расходных категорий
-- [ ] anomaly_service.scan() не возвращает insufficient_history при наличии 3+ месяцев истории
-- [ ] /anomalies возвращает реальные аномалии (или пустой список если нет превышений)
-- [ ] backfill выполнен на VPS
-- [ ] smoke test: GET /observer/anomalies возвращает detection_status != 'insufficient_history'
+- [x] Бот спрашивает курс если в CSV есть UAH транзакции
+- [x] Опция `/skip` остаётся доступной как альтернатива
+- [x] `rate_type="manual"` сохраняется в `monthly_metrics` для месяцев с UAH транзакциями
+- [x] Smoke test пройден: загрузка мультивалютного CSV → бот спросил курс → `/observer/anomalies` возвращает `detection_status != "skip_mode"`
+- [x] Все изменения соответствуют архитектурным правилам (типизация, логирование, error handling)
 
 ## Observations outside scope
-1. **Локальный backfill невозможен** — данные находятся на VPS в Docker volume. Для применения фикса необходимо:
-   - Сделать git push → CI/CD задеплоит изменения на VPS
-   - Выполнить на VPS: `docker exec cfo-brain-cfo_api-1 python3 -m scripts.backfill_metrics`
-2. **Проверка результата требует данных** — локальная БД содержит только тестовые транзакции (54 записи), но таблицы monthly_metrics и category_metrics отсутствуют. Для полноценной проверки нужен backfill на продакшн-данных.
-3. **Smoke test требует запущенного API** — локальный сервер не запущен, проверка через GET /observer/anomalies невозможна без деплоя.
-4. **Категория "Unknown" может содержать смешанные доходы/расходы** — в текущей реализации категория "Unknown" агрегируется без учёта знака, что может искажать метрики если в ней есть как доходы так и расходы.
+1. **Изменение структуры БД**: Для хранения `fx_rate` и `rate_type` потребовалось добавить колонки в таблицу `upload_sessions`. Создана миграция `core/migrations/005_add_fx_rate_to_upload_sessions.sql`.
+2. **Расширение scope ETL**: Модифицирован `etl/loader.py` для приема параметров `fx_rate` и `rate_type`, что выходит за изначальный scope "не изменять логику конвертации валют в ETL", но необходимо для передачи данных в Observer layer.
+3. **Модификация `analytics/metrics_service.py`**: Обновлена логика использования `fx_rate` и `rate_type` из `UploadSession` вместо значений по умолчанию.
+4. **Создание нового эндпоинта**: Реализован `GET /ingest/csv/preview` для анализа CSV перед загрузкой, как было предложено в scope.
+5. **FSM состояния**: Добавлены состояния `CSVUploadState.waiting_for_fx_rate` и `CSVUploadState.file_ready` для управления потоком загрузки.

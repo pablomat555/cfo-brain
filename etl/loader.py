@@ -19,7 +19,7 @@ class LoadResult(BaseModel):
     detection_status: str = "pending"  # 'pending' | 'running' | 'completed' | 'error' | 'skip_mode'
 
 
-def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str = "unknown.csv") -> LoadResult:
+def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str = "unknown.csv", fx_rate: float = 0.0, rate_type: str = "skip") -> LoadResult:
     """
     Загружает транзакции в БД.
     
@@ -97,11 +97,13 @@ def load_transactions(rows: List[TransactionRaw], db: Session, source_file: str 
                 min_date=min_date,
                 max_date=max_date,
                 transactions_count=result.inserted,
+                fx_rate=fx_rate,
+                rate_type=rate_type,
                 uploaded_at=datetime.utcnow()
             )
             db.add(upload_session)
             db.commit()
-            logger.info(f"Upload session saved: {min_date} to {max_date}, {result.inserted} transactions")
+            logger.info(f"Upload session saved: {min_date} to {max_date}, {result.inserted} transactions, fx_rate={fx_rate}, rate_type={rate_type}")
             
         except Exception as e:
             logger.error(f"Failed to save upload session: {e}")

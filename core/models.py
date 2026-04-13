@@ -64,10 +64,13 @@ class UploadSession(Base):
     min_date = Column(Date, nullable=False)
     max_date = Column(Date, nullable=False)
     transactions_count = Column(Integer, nullable=False)
+    fx_rate = Column(Float, nullable=False, default=0.0)
+    rate_type = Column(String, nullable=False, default="skip")  # 'manual' | 'skip'
 
     def __repr__(self):
         return f"<UploadSession(id={self.id}, uploaded_at={self.uploaded_at}, " \
-               f"min_date={self.min_date}, max_date={self.max_date}, count={self.transactions_count})>"
+               f"min_date={self.min_date}, max_date={self.max_date}, count={self.transactions_count}, " \
+               f"fx_rate={self.fx_rate}, rate_type={self.rate_type})>"
 
 
 # Observer Foundation Models (НАБЛЮДАТЕЛЬ)

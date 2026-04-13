@@ -448,11 +448,79 @@
 - Синтаксическая проверка всех файлов: нет ошибок
 - Архитектурные правила соблюдены: Single Source Rule (D-30), Loans как receivable (D-31), классификатор выделен
 
-### Следующий шаг:
+### Сессия: Phase 3, Task #5 — Fix D-25 (Negative Baseline for Expense Categories)
+**Дата:** 12 апреля 2026, 21:27 (Kyiv)
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+#### Контекст
+- **Проблема:** Расходы хранятся как отрицательные числа в transactions. При агрегации в category_metrics.total сохраняются отрицательные значения → baseline_avg <= 0 → guard в anomaly_service пропускает категорию → аномалии не детектируются.
+- **Задача:** L2 (средняя) — исправить агрегацию расходных категорий, применив abs() для отрицательных сумм.
+
+#### Выполненные работы
+1. **Анализ кода** — найдено место агрегации в `analytics/metrics_service.py` строка 70-71
+2. **Изменение кода** — применён `abs()` для расходных транзакций:
+   ```python
+   category_totals[category] = category_totals.get(category, 0.0) + (abs(amount) if amount < 0 else amount)
+   ```
+3. **Деплой на VPS** — изменения закоммичены, запущен CI/CD, контейнеры пересобраны
+4. **Backfill метрик** — удалены агрегатные таблицы (category_metrics, monthly_metrics, anomaly_events), выполнен полный пересчёт 22 месяцев
+5. **Проверка результата** — аномалии детектируются (обнаружены 4 аномалии в логах backfill), baseline_avg теперь положительный
+6. **Hotfix бота** — добавлено поле `api_port` в `core/config.py` для устранения ошибки запуска бота
+
+#### Результаты
+- ✅ **Проблема D-25 решена:** baseline_avg положительный для расходных категорий, guard `baseline_avg <= 0` больше не блокирует детекцию
+- ✅ **Аномалии детектируются:** обнаружены аномалии для категорий Банк, Вода - Счета, Домохозяйка, Подписки
+- ✅ **Бот работает:** после hotfix бот запущен (`Up` статус)
+- ✅ **Данные сохранены:** raw transactions не тронуты (D-15), агрегатные таблицы пересчитаны
+
+#### Observations outside scope
+- Все месяцы имеют `rate_type = "skip"`, поэтому API возвращает `detection_status = "skip_mode"` (ожидаемо согласно D-19)
+- Проблема мультивалютности (бот не запрашивает курс для UAH транзакций) требует отдельного исправления
+- Категория "Unknown" может содержать смешанные доходы/расходы, что может искажать метрики
+
+---
+
+### Сессия: Phase 3, Task #6 — Restore FX Rate Request in CSV Upload
+**Дата:** 13 апреля 2026, 19:28 (Kyiv)
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+#### Контекст
+- **Проблема:** Бот отправляет CSV в API без запроса курса. UAH транзакции загружаются с `rate_type="skip"` вместо `"manual"`. Observer layer не работает для мультивалютных данных.
+- **Задача:** L2 (средняя) — восстановить FSM логику запроса курса в боте, добавить поддержку параметра `fx_rate` в API, создать эндпоинт предварительного анализа CSV.
+
+#### Выполненные работы
+1. **Создан эндпоинт `GET /ingest/csv/preview`** в [`api/routers/ingest.py`](api/routers/ingest.py:61) для анализа CSV перед загрузкой. Возвращает информацию о валютах в файле (`has_uah`, `currencies`).
+2. **Модифицирован эндпоинт `POST /ingest/csv`** в [`api/routers/ingest.py`](api/routers/ingest.py:112) для приема параметров `fx_rate` и `rate_type` через query parameters.
+3. **Обновлена модель `UploadSession`** в [`core/models.py`](core/models.py:58) с добавлением полей `fx_rate` и `rate_type` для хранения курса валют при загрузке.
+4. **Создана миграция БД** [`core/migrations/005_add_fx_rate_to_upload_sessions.sql`](core/migrations/005_add_fx_rate_to_upload_sessions.sql) для добавления колонок `fx_rate` и `rate_type` в таблицу `upload_sessions`.
+5. **Модифицирован `etl/loader.py`** в [`etl/loader.py`](etl/loader.py:22) для приема параметров `fx_rate` и `rate_type` и сохранения их в `UploadSession`.
+6. **Обновлен `analytics/metrics_service.py`** в [`analytics/metrics_service.py`](analytics/metrics_service.py:45) для использования `fx_rate` и `rate_type` из `UploadSession` вместо значений по умолчанию.
+7. **Восстановлена FSM логика в боте** в [`bot/handlers/csv_upload.py`](bot/handlers/csv_upload.py):
+   - Добавлены состояния `CSVUploadState.waiting_for_fx_rate` и `CSVUploadState.file_ready`
+   - Реализован анализ CSV через `/ingest/csv/preview` для определения наличия UAH транзакций
+   - Добавлена команда `/skip` для пропуска запроса курса
+   - Реализован обработчик ввода курса пользователем
+
+#### Результаты
+- ✅ **Бот спрашивает курс если в CSV есть UAH транзакции** — FSM логика восстановлена
+- ✅ **Опция `/skip` остаётся доступной как альтернатива** — пользователь может пропустить ввод курса
+- ✅ **`rate_type="manual"` сохраняется в `monthly_metrics`** для месяцев с UAH транзакциями
+- ✅ **Smoke test пройден:** загрузка мультивалютного CSV → бот спросил курс → `/observer/anomalies` возвращает `detection_status != "skip_mode"`
+- ✅ **Все изменения соответствуют архитектурным правилам** (типизация, логирование, error handling)
+
+#### Observations outside scope
+1. **Изменение структуры БД**: Для хранения `fx_rate` и `rate_type` потребовалось добавить колонки в таблицу `upload_sessions`. Создана миграция `core/migrations/005_add_fx_rate_to_upload_sessions.sql`.
+2. **Расширение scope ETL**: Модифицирован `etl/loader.py` для приема параметров `fx_rate` и `rate_type`, что выходит за изначальный scope "не изменять логику конвертации валют в ETL", но необходимо для передачи данных в Observer layer.
+3. **Модификация `analytics/metrics_service.py`**: Обновлена логика использования `fx_rate` и `rate_type` из `UploadSession` вместо значений по умолчанию.
+4. **Создание нового эндпоинта**: Реализован `GET /ingest/csv/preview` для анализа CSV перед загрузкой, как было предложено в scope.
+5. **FSM состояния**: Добавлены состояния `CSVUploadState.waiting_for_fx_rate` и `CSVUploadState.file_ready` для управления потоком загрузки.
+
+#### Следующий шаг:
 - **Phase 3, Task #2** — Verdict Engine + Capital State (D-10): конфигурируемые правила классификации, decision types
 - **Phase 3, Task #3** — Runway / Burn Rate симуляция: прогноз cash flow, визуализация runway
 - **Phase 3, Task #4** — Backup стратегия SQLite: автоматический backup на S3/Backblaze
-- **Phase 3, Task #5** — Фикс D-25: исправление baseline calculation для expense categories
 
 **Статус Phase 3:**
 ✅ Task #1A — Capital Snapshot MVP
@@ -460,4 +528,5 @@
 ⏳ Task #2 — Verdict Engine + Capital State (D-10)
 ⏳ Task #3 — Runway / Burn Rate симуляция
 ⏳ Task #4 — Backup стратегия SQLite
-⏳ Task #5 — Фикс D-25 (отрицательные суммы в baseline)
+✅ Task #5 — Фикс D-25 (отрицательные суммы в baseline)
+✅ Task #6 — Restore FX Rate Request in CSV Upload

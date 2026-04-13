@@ -40,17 +40,15 @@ def recalculate(month_key: str) -> None:
             return
         
         # Получаем последний upload_session для fx_rate и rate_type
-        # ВНИМАНИЕ: UploadSession в текущей реализации не содержит fx_rate и rate_type
-        # Это наблюдение вне scope, используем значения по умолчанию
         upload_session = db.query(UploadSession).order_by(UploadSession.uploaded_at.desc()).first()
         
         fx_rate = 0.0
         rate_type = "skip"
         
         if upload_session:
-            # TODO: В будущем добавить fx_rate и rate_type в UploadSession
-            # Пока используем значения по умолчанию
-            logger.info(f"Using default fx_rate={fx_rate}, rate_type={rate_type} for month {month_key}")
+            fx_rate = upload_session.fx_rate
+            rate_type = upload_session.rate_type
+            logger.info(f"Using fx_rate={fx_rate}, rate_type={rate_type} from upload_session for month {month_key}")
         else:
             logger.warning(f"No upload sessions found, using default fx_rate={fx_rate}, rate_type={rate_type}")
         

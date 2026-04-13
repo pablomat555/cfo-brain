@@ -59,7 +59,7 @@ async def _run_observer(min_date, max_date):
         logger.error(f"Observer pipeline failed: {e}")
 
 
-@router.get("/csv/preview")
+@router.post("/csv/preview")
 async def preview_csv(
     file: UploadFile = File(...)
 ) -> Dict[str, Any]:

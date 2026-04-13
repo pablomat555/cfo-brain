@@ -141,7 +141,7 @@ async def handle_csv_upload(message: types.Message, bot: Bot, state: FSMContext)
         # Отправляем на preview для анализа валют
         async with httpx.AsyncClient(timeout=30.0) as client:
             files = {"file": (document.file_name, file_bytes, "text/csv")}
-            response = await client.get(
+            response = await client.post(
                 "http://cfo_api:8002/ingest/csv/preview",
                 files=files
             )

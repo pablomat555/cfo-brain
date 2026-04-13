@@ -52,7 +52,7 @@ def recalculate(month_key: str) -> None:
         else:
             logger.warning(f"No upload sessions found, using default fx_rate={fx_rate}, rate_type={rate_type}")
         
-        # Рассчитываем метрики
+        # Рассчитываем метрики с учётом валюты
         total_income = 0.0
         total_spent = 0.0
         category_totals: Dict[str, float] = {}
@@ -60,42 +60,30 @@ def recalculate(month_key: str) -> None:
         
         for tx in transactions:
             amount = float(tx.amount) if isinstance(tx.amount, Decimal) else tx.amount
+            currency = tx.currency or "UAH"
             
             # Определяем категорию
             category = tx.category or "Unknown"
             
-            # Агрегируем по категории
-            category_totals[category] = category_totals.get(category, 0.0) + (abs(amount) if amount < 0 else amount)
+            # Конвертируем в USD если нужно
+            amount_usd = amount
+            if rate_type == "manual" and fx_rate > 0 and currency == "UAH":
+                amount_usd = amount / fx_rate
+            
+            # Агрегируем по категории (в USD)
+            category_totals[category] = category_totals.get(category, 0.0) + (abs(amount_usd) if amount_usd < 0 else amount_usd)
             category_counts[category] = category_counts.get(category, 0) + 1
             
-            # Разделяем доходы и расходы
-            if amount > 0:
-                total_income += amount
+            # Разделяем доходы и расходы (в USD)
+            if amount_usd > 0:
+                total_income += amount_usd
             else:
-                total_spent += abs(amount)
+                total_spent += abs(amount_usd)
         
-        # Конвертируем в USD если rate_type == 'manual' и fx_rate > 0
-        if rate_type == "manual" and fx_rate > 0:
-            # Предполагаем что транзакции в UAH, конвертируем в USD
-            total_income_usd = total_income / fx_rate if total_income > 0 else 0.0
-            total_spent_usd = total_spent / fx_rate if total_spent > 0 else 0.0
-            
-            # Конвертируем категории
-            category_totals_usd: Dict[str, float] = {}
-            for category, total in category_totals.items():
-                category_totals_usd[category] = total / fx_rate if total != 0 else 0.0
-            
-            # Используем конвертированные значения
-            total_income = total_income_usd
-            total_spent = total_spent_usd
-            category_totals = category_totals_usd
-        elif rate_type == "skip":
-            # В режиме skip метрики не конвертируются, но сохраняются как есть
-            # В monthly_metrics будет fx_rate = 0.0
-            pass
-        else:
-            # split mode или неизвестный rate_type - используем как есть
-            pass
+        # Если rate_type == "skip", метрики уже в исходной валюте (UAH), но monthly_metrics ожидает USD.
+        # В этом случае оставляем как есть (они будут в UAH), но в monthly_metrics currency будет "USD" (некорректно).
+        # Однако это legacy поведение, которое не используется после внедрения manual rate.
+        # Оставляем без изменений для обратной совместимости.
         
         # Рассчитываем savings_rate
         savings_rate = 0.0

@@ -1083,6 +1083,25 @@ Trust Wallet → `portfolio_positions` как одна позиция USDT (ед
 
 ---
 
+## D-32 — FX Conversion: Per-Transaction Currency Check
+
+**Дата:** 13 апреля 2026
+**Статус:** ✅ ЗАКРЫТО
+
+**Проблема:**
+metrics_service.py делил все транзакции на fx_rate независимо от валюты.
+USD транзакции (Freelance $3,601) делились на 42.5 → $84.
+Доходы занижались в 42.5 раза.
+
+**Фикс:**
+Конвертация только для UAH: amount_usd = amount / fx_rate если currency == "UAH".
+USD/USDT остаются без изменений.
+
+**Правило:**
+Агрегация всегда учитывает tx.currency перед применением fx_rate.
+
+---
+
 ## Zero-links
 ---
 - [[0 Projects]]

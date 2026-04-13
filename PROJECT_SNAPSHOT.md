@@ -113,6 +113,11 @@
 - ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
 - ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
 
+### Recently Closed Issues
+- ✅ **D-32 — FX Conversion: Per-Transaction Currency Check** — исправлен баг агрегации доходов (конвертация только UAH транзакций)
+- ✅ **savings_rate display fix в scheduler** — убрано умножение на 100, дайджест показывает корректные проценты
+- ✅ **/digest команда добавлена** — ручной запуск дайджеста через команду бота
+
 ## 5. Фокус сессии
 - **Цель:** Task #6 (FX Rate Request) завершён, система готова к мультивалютному анализу
 - **Last Commit:** Phase 3 Task #6 — Restore FX Rate Request in CSV Upload

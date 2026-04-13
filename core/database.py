@@ -22,6 +22,9 @@ def init_db():
     
     # Применяем миграцию 004 для фикса CHECK constraint liquidity_bucket
     apply_liquidity_constraint_fix_migration()
+    
+    # Применяем миграцию 005 для добавления fx_rate и rate_type в upload_sessions
+    apply_fx_rate_migration()
 
 
 def apply_observer_migration():
@@ -146,6 +149,50 @@ def apply_liquidity_constraint_fix_migration():
     except Exception as e:
         logger.error(f"Error applying migration 004: {e}")
         # Не падаем, т.к. constraint может быть уже исправлен
+
+
+def apply_fx_rate_migration():
+    """Применяет миграцию 005: добавляет fx_rate и rate_type в upload_sessions"""
+    inspector = inspect(engine)
+    
+    # Проверяем наличие колонки fx_rate в upload_sessions
+    try:
+        columns = [col['name'] for col in inspector.get_columns('upload_sessions')]
+    except Exception:
+        # Таблица может не существовать (маловероятно, но на всякий случай)
+        logger.debug("Table upload_sessions does not exist, skipping migration 005")
+        return
+    
+    if 'fx_rate' in columns:
+        logger.debug("Column fx_rate already exists, skipping migration 005")
+        return
+    
+    logger.info("Applying migration 005: adding fx_rate and rate_type to upload_sessions")
+    
+    migration_path = os.path.join(os.path.dirname(__file__), "migrations", "005_add_fx_rate_to_upload_sessions.sql")
+    
+    if not os.path.exists(migration_path):
+        logger.error(f"Migration file not found: {migration_path}")
+        return
+    
+    try:
+        with open(migration_path, 'r') as f:
+            sql_content = f.read()
+        
+        # Выполняем SQL миграцию
+        with engine.connect() as conn:
+            statements = sql_content.split(';')
+            for statement in statements:
+                statement = statement.strip()
+                if statement:
+                    conn.execute(text(statement))
+            conn.commit()
+        
+        logger.info("Migration 005 applied successfully")
+        
+    except Exception as e:
+        logger.error(f"Error applying migration 005: {e}")
+        # Не падаем, т.к. колонки могут быть уже добавлены
 
 
 def get_db():

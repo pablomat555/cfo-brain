@@ -58,7 +58,7 @@ async def weekly_digest(bot: Bot, chat_id: int):
                 for item in metrics:
                     month = item["month_key"]
                     burn = item["burn_rate"]
-                    save = item["savings_rate"] * 100  # в процентах
+                    save = item["savings_rate"]  # уже в процентах
                     spent = item["total_spent"]
                     income = item["total_income"]
                     

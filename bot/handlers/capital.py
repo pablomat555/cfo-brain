@@ -13,7 +13,7 @@ from core.config import get_settings
 
 router = Router()
 settings = get_settings()
-API_BASE_URL = f"http://localhost:{settings.api_port}"
+API_BASE_URL = f"http://cfo_api:{settings.api_port}"
 
 
 # FSM States для /capital_add

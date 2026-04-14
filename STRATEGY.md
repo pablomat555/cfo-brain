@@ -72,3 +72,14 @@
 - До $100 — автоматически approved
 - $100-$500 — approved with impact (влияет на месячный burn rate)
 - Свыше $500 — требует обоснования в момент принятия решения
+
+## CFO Rules
+> Machine-readable блок для strategy_loader. Не редактировать вручную без обновления human-readable секций выше.
+
+burn_rate_limit_usd: 1500
+payoneer_target_usd: 5000
+sgov_target_usd: 5000
+monthly_investment_usd: 500
+emergency_fund_months: 3
+exceptional_auto_approved_usd: 100
+exceptional_with_impact_usd: 500

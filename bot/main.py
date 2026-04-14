@@ -15,6 +15,7 @@ from bot.handlers.commands import router as commands_router
 from bot.handlers.observer import router as observer_router
 from bot.handlers.capital import router as capital_router
 from bot.handlers.digest import router as digest_router
+from bot.handlers.verdict import router as verdict_router
 from bot.scheduler import setup_scheduler
 
 
@@ -44,6 +45,7 @@ async def main():
     dp.include_router(observer_router)
     dp.include_router(capital_router)
     dp.include_router(digest_router)
+    dp.include_router(verdict_router)
     
     # Запуск scheduler для еженедельного дайджеста
     if settings.owner_chat_id:

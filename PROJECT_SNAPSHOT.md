@@ -103,6 +103,8 @@
 - ✅ **Portfolio Snapshot CSV:** Поддержка загрузки portfolio snapshot через POST /capital/ingest/capital_snapshot с автоматической классификацией
 - ✅ **Bot Commands:** Новые команды /position_add (FSM wizard), /positions (список позиций), /position_edit (stub)
 - ✅ **FX Rate Request:** Бот запрашивает курс для UAH транзакций при загрузке CSV, предоставляет опцию /skip, сохраняет rate_type="manual" в monthly_metrics
+- ✅ **Verdict Engine:** Детерминированный движок принятия решений POST /verdict → Capital State + STRATEGY.md → APPROVED / APPROVED_WITH_IMPACT / DENIED. Включает три политики (Routine, Strategic, Exceptional), расчёт impact, интеграцию с ботом командой /verdict
+- ✅ **CFO Rules блок в STRATEGY.md:** Machine-readable секция с параметрами стратегии для strategy_loader, парсинг через regex, fallback на defaults с warning
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
@@ -163,7 +165,7 @@
 **Статус Phase 3:**
 ✅ Task #1A — Capital Snapshot MVP
 ✅ Task #1B — Portfolio Breakdown & Enhanced Capital State
-⏳ Task #2 — Verdict Engine + Capital State (D-10)
+✅ Task #2 — Verdict Engine + Capital State (D-10)
 ⏳ Task #3 — Runway / Burn Rate симуляция
 ⏳ Task #4 — Backup стратегия SQLite
 ✅ Task #5 — Фикс D-25 (отрицательные суммы в baseline)

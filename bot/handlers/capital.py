@@ -108,15 +108,16 @@ def format_capital_state(state_data: Dict[str, Any]) -> str:
             
             for account in bucket_data["accounts"]:
                 account_name = account["account_name"]
-                balance_usd = account["balance_usd"]
-                currency = account["currency"]
-                balance = account["balance"]
-                
-                if currency in ["USD", "USDT"]:
-                    lines.append(f"  • {account_name}: ${format_currency_amount(balance_usd)}")
+                asset_symbol = account["asset_symbol"]
+                value_usd = account["value_usd"]
+                currency = account.get("currency", "USD")
+                market_value = account["market_value"]
+                fx_rate = account.get("fx_rate", 1.0)
+
+                if currency in ["USD", "USDT"] or fx_rate == 1.0:
+                    lines.append(f"  • {account_name} ({asset_symbol}): ${format_currency_amount(value_usd)}")
                 else:
-                    fx_rate = account["fx_rate"]
-                    lines.append(f"  • {account_name}: ${format_currency_amount(balance_usd)} ({balance:,.0f} {currency} @ {fx_rate})")
+                    lines.append(f"  • {account_name} ({asset_symbol}): ${format_currency_amount(value_usd)} ({market_value:,.0f} {currency} @ {fx_rate})")
     
     return "\n".join(lines)
 

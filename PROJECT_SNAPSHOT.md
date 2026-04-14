@@ -104,6 +104,7 @@
 - ✅ **Bot Commands:** Новые команды /position_add (FSM wizard), /positions (список позиций), /position_edit (stub)
 - ✅ **FX Rate Request:** Бот запрашивает курс для UAH транзакций при загрузке CSV, предоставляет опцию /skip, сохраняет rate_type="manual" в monthly_metrics
 - ✅ **Verdict Engine:** Детерминированный движок принятия решений POST /verdict → Capital State + STRATEGY.md → APPROVED / APPROVED_WITH_IMPACT / DENIED. Включает три политики (Routine, Strategic, Exceptional), расчёт impact, интеграцию с ботом командой /verdict
+- ✅ **Runway Engine:** Burn Rate Calculator + Runway Simulation в analytics/runway_engine.py. Эндпоинты GET /runway и POST /runway/simulate, фильтрация по rate_type="manual", расчёт runway месяцев до emergency floor и нуля, self-sustaining статус при положительном cash flow. Интеграция с ботом командой /runway.
 - ✅ **CFO Rules блок в STRATEGY.md:** Machine-readable секция с параметрами стратегии для strategy_loader, парсинг через regex, fallback на defaults с warning
 
 ### Known Issues
@@ -118,11 +119,15 @@
 ### Recently Closed Issues
 - ✅ **D-32 — FX Conversion: Per-Transaction Currency Check** — исправлен баг агрегации доходов (конвертация только UAH транзакций)
 - ✅ **savings_rate display fix в scheduler** — убрано умножение на 100, дайджест показывает корректные проценты
-- ✅ **/digest команда добавлена** — ручной запуск дайджеста через команду бота
+- ✅ **/digest команда добавена** — ручной запуск дайджеста через команду бота
+- ✅ **Phase 3, Task #3 — Runway / Burn Rate симуляция** — реализован BurnRateCalculator и RunwayEngine, эндпоинты GET /runway и POST /runway/simulate, фильтрация по rate_type="manual", интеграция с ботом командой /runway, добавлена запись D-34
+- ✅ **WAR MODE фикс #1 — API_BASE_URL** — `bot/handlers/capital.py` использовал `localhost:8002` вместо `cfo_api:8002`, бот не мог достучаться до API (`All connection attempts failed`). Коммит `0a2df86`.
+- ✅ **WAR MODE фикс #2 — Markdown → HTML** — все 8 мест в `capital.py` с `parse_mode="Markdown"` переведены на `parse_mode="HTML"`. Динамические поля (account_name, asset_symbol, liquidity_bucket) содержали символы ломающие Markdown парсер Telegram. Коммит `0b3a61b`.
+- ✅ **WAR MODE фикс #3 — field mismatch в /capital** — `format_capital_state` читал поля `balance_usd`/`balance`, API отдаёт `value_usd`/`market_value`. KeyError устранён, добавлен `asset_symbol` в строку для читаемости. Коммит `33931f3`.
 
 ## 5. Фокус сессии
-- **Цель:** Task #6 (FX Rate Request) завершён, система готова к мультивалютному анализу
-- **Last Commit:** Phase 3 Task #6 — Restore FX Rate Request in CSV Upload
+- **Цель:** WAR MODE — три production-фикса в bot/handlers/capital.py
+- **Last Commit:** `33931f3` fix: format_capital_state — balance_usd/balance → value_usd/market_value
 - **Git Status:** Все изменения закоммичены и запушены, CI/CD деплой выполнен, контейнеры работают
 
 ## Следующий шаг
@@ -166,7 +171,7 @@
 ✅ Task #1A — Capital Snapshot MVP
 ✅ Task #1B — Portfolio Breakdown & Enhanced Capital State
 ✅ Task #2 — Verdict Engine + Capital State (D-10)
-⏳ Task #3 — Runway / Burn Rate симуляция
+✅ Task #3 — Runway / Burn Rate симуляция
 ⏳ Task #4 — Backup стратегия SQLite
 ✅ Task #5 — Фикс D-25 (отрицательные суммы в baseline)
 ✅ Task #6 — Restore FX Rate Request in CSV Upload

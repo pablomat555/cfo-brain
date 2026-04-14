@@ -1,5 +1,43 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 14 апреля 2026, 20:45 (Kyiv)
+Последнее обновление: 14 апреля 2026, 21:00 (Kyiv)
+
+---
+
+## Сессия: WAR MODE — Production Hotfixes (capital.py)
+**Дата:** 14 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+После деплоя Task #2 и Task #3 бот не мог обрабатывать команды `/positions` и `/capital`. Три последовательно обнаруженных бага в `bot/handlers/capital.py`.
+
+### Фикс #1 — API_BASE_URL: localhost → cfo_api
+**Симптом:** `All connection attempts failed` при вызове `/positions`
+**Причина:** `capital.py` использовал `http://localhost:{api_port}` — внутри Docker-сети это сам контейнер бота, не API. Все остальные хендлеры (csv_upload, commands, verdict, observer) корректно использовали `http://cfo_api:8002`.
+**Фикс:** Строка 16 — `localhost` → `cfo_api`
+**Коммит:** `0a2df86`
+
+### Фикс #2 — Markdown → HTML parse_mode
+**Симптом:** `Bad Request: can't parse entities: Can't find end of the entity starting at byte offset 297`
+**Причина:** 8 мест в файле использовали `parse_mode="Markdown"` с динамическим контентом из БД (account_name, asset_symbol, liquidity_bucket). Символы `_` в именах активов (Trust_Wallet, LOAN-UAH и др.) ломали Markdown парсер Telegram.
+**Фикс:** Конвертация всех `*...*` → `<b>...</b>` и `parse_mode="Markdown"` → `parse_mode="HTML"` во всём файле (43 замены).
+**Коммит:** `0b3a61b`
+
+### Фикс #3 — Field mismatch в format_capital_state
+**Симптом:** `KeyError: 'balance_usd'` при вызове `/capital`
+**Причина:** `format_capital_state()` читала поля `balance_usd` и `balance` из ответа API, но `/capital/state` возвращает `value_usd` и `market_value`. Рассинхрон возник между старым кодом форматирования и новой схемой API (Task #1B).
+**Фикс:** Обновлены имена полей в `format_capital_state`, добавлен `asset_symbol` в строку вывода.
+**Коммит:** `33931f3`
+
+### Результаты
+- ✅ `/positions` — работает, данные отдаются
+- ✅ `/capital` — работает, KeyError устранён
+- ✅ Все три коммита на VPS через CI/CD, контейнеры перезапущены
+
+### Состояние после сессии
+- ⚠️ В БД тестовые позиции от `2026-04-12` (Task #1B dev data). Не баг кода — нужна ручная загрузка актуального снапшота через `/position_add` с датой `2026-04-14`. Старые записи становятся историческими.
+
+---
 
 ## Phase Transition: Phase 2 → Phase 3
 **Дата:** 10 апреля 2026
@@ -631,3 +669,53 @@
 - Деплой изменений (коммиты 63aa02d, 84aded3) через CI/CD.
 - Тестирование в production с реальными запросами через бота.
 - Переход к Task #3 (Runway / Burn Rate симуляция).
+
+---
+
+## Сессия: Phase 3, Task #3 — Runway / Burn Rate симуляция
+**Дата:** 14 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+- **Цель:** Реализовать Runway Engine: GET /runway + POST /runway/simulate → на основе Capital State + monthly_metrics вернуть сколько месяцев протянет liquid капитал при текущем или изменённом cash flow.
+- **Проблема:** Нужен прогноз финансовой устойчивости (runway) на основе исторических данных о доходах и расходах.
+- **Задача:** L2 (средняя) — создание BurnRateCalculator и RunwayEngine, эндпоинтов, интеграция с ботом.
+- **Фаза:** Phase 3 — СТРАТЕГ (третья задача)
+
+### Выполненные работы
+1. **Создан `analytics/runway_engine.py`** — содержит классы:
+   - `BurnRateStats` (Pydantic модель) — avg_burn, avg_income, avg_savings_rate, burn_trend, months_used, rate_type_filter.
+   - `BurnRateCalculator` — рассчитывает средние значения за последние N месяцев, фильтрует только rate_type="manual", определяет тренд (stable/growing/declining).
+   - `ScenarioParams` (Pydantic модель) — income_change, expense_change, months_history.
+   - `RunwayResponse` (Pydantic модель) — runway_status, runway_months, runway_months_liquid_zero, monthly_delta, burn_rate_avg, income_avg, savings_rate_avg, burn_trend, emergency_floor, scenario, capital_snapshot, as_of, warning.
+   - `RunwayEngine` — симулирует runway (помесячно, макс 120 итераций), определяет self_sustaining если monthly_delta >= 0, иначе вычисляет месяцы до emergency floor и до нуля.
+2. **Создан `api/routers/runway.py`** — роутер с эндпоинтами:
+   - `GET /runway` — базовый сценарий (без изменений дохода/расходов).
+   - `POST /runway/simulate` — произвольный сценарий с параметрами ScenarioParams.
+   - Обработка ошибок: capital state пустой → 400, нет manual-rate месяцев → 400.
+3. **Создан `bot/handlers/runway.py`** — команда `/runway`, форматирование ответа на русском, строки как константы вверху файла, вызов API.
+4. **Обновлён `api/main.py`** — подключён runway router.
+5. **Обновлён `bot/main.py`** — зарегистрирован runway handler.
+6. **Написаны интеграционные тесты `test_runway_integration.py`** — 7 тестов, покрывающих все сценарии из TASK.md (self_sustaining, income drop 50%, expenses grow 100%, нет данных, capital state пустой, экстремальный сценарий, фильтрация skip месяцев). Все тесты проходят.
+7. **Добавлена запись D-34 в DECISION_LOG.md** — решение о Runway Engine: Self-Sustaining Status + Manual-Rate Filter.
+
+### Результаты
+- ✅ **GET /runway возвращает RunwayResponse** с корректным runway_status (self_sustaining или depleting).
+- ✅ **POST /runway/simulate принимает ScenarioParams** и применяет изменения к доходам/расходам.
+- ✅ **BurnRateCalculator фильтрует только rate_type="manual"** — месяцы с rate_type="skip" исключаются.
+- ✅ **monthly_delta >= 0 → runway_status="self_sustaining", runway_months=None** — никогда не возвращается искусственно большое число месяцев.
+- ✅ **Симуляция помесячно, макс 120 итераций** — корректно вычисляет runway_months и runway_months_liquid_zero.
+- ✅ **warning если runway_months < 6** — предупреждение о критически малом runway.
+- ✅ **capital state пустой → 400** с объяснением "Capital State не загружен. Используй /capital_add."
+- ✅ **нет manual месяцев → 400** с объяснением "Нет данных для расчёта. Загрузи CSV с указанием курса UAH."
+- ✅ **/runway команда в боте работает** — форматирует ответ в читаемый вид на русском языке.
+
+### Observations outside scope
+- В тестовых данных фикстуры изначально avg_income был слишком высоким относительно avg_burn, что приводило к self_sustaining даже при -50% income. Исправлено уменьшением доходов в тестовых данных, чтобы сценарии изменения давали отрицательный delta.
+- BurnRateCalculator использует простой алгоритм тренда (сравнение первой и второй половины выборки). Для малого количества месяцев тренд может быть неточным, но это приемлемо для MVP.
+
+### Следующий шаг
+- Деплой изменений через CI/CD.
+- Тестирование в production с реальными данными через бота.
+- Переход к Task #4 (Backup стратегия SQLite).

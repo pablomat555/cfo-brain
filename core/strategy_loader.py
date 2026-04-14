@@ -122,6 +122,34 @@ def _parse_strategy(text: str) -> StrategyConfig:
         field_name="exceptional_with_impact_usd"
     )
 
+    # Парсинг CFO Rules блока (machine-readable)
+    # Формат: key: value
+    cfo_rules_section_match = re.search(r"## CFO Rules\n(.*?)(?=\n## |\Z)", text, re.DOTALL)
+    if cfo_rules_section_match:
+        cfo_text = cfo_rules_section_match.group(1)
+        # Извлечение каждого параметра
+        patterns = {
+            "burn_rate_limit_usd": r"burn_rate_limit_usd:\s*([\d.]+)",
+            "payoneer_target_usd": r"payoneer_target_usd:\s*([\d.]+)",
+            "sgov_target_usd": r"sgov_target_usd:\s*([\d.]+)",
+            "monthly_investment_usd": r"monthly_investment_usd:\s*([\d.]+)",
+            "emergency_fund_months": r"emergency_fund_months:\s*([\d.]+)",
+            "exceptional_auto_approved_usd": r"exceptional_auto_approved_usd:\s*([\d.]+)",
+            "exceptional_with_impact_usd": r"exceptional_with_impact_usd:\s*([\d.]+)",
+        }
+        for field, pattern in patterns.items():
+            match = re.search(pattern, cfo_text)
+            if match:
+                try:
+                    value = float(match.group(1)) if field != "emergency_fund_months" else int(match.group(1))
+                    setattr(config, field, value)
+                    logger.debug(f"strategy_loader: {field} = {value} (from CFO Rules)")
+                except Exception as e:
+                    logger.warning(f"strategy_loader: failed to parse {field} from CFO Rules: {e}")
+        # Пересчитываем min_liquid_reserve после возможного обновления payoneer_target_usd и sgov_target_usd
+        config.min_liquid_reserve = config.payoneer_target_usd + config.sgov_target_usd
+        logger.debug(f"strategy_loader: min_liquid_reserve updated = {config.min_liquid_reserve}")
+
     # Итоговая проверка: если ни одно значение не было распарсено (все остались default),
     # значит CFO Rules блок отсутствует или формат изменился
     parsed_count = sum(1 for v in [

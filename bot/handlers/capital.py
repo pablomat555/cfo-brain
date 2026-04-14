@@ -96,15 +96,15 @@ def format_capital_state(state_data: Dict[str, Any]) -> str:
     }
     
     lines = [
-        f"💼 *Capital State* ({formatted_date})",
-        f"*Net Worth:* ${format_currency_amount(state_data['total_net_worth_usd'])}",
+        f"💼 <b>Capital State</b> ({formatted_date})",
+        f"<b>Net Worth:</b> ${format_currency_amount(state_data['total_net_worth_usd'])}",
         ""
     ]
-    
+
     for bucket_name, bucket_data in state_data["by_bucket"].items():
         if bucket_data["total_usd"] > 0:
             emoji = bucket_emojis.get(bucket_name, "•")
-            lines.append(f"{emoji} *{bucket_name.replace('_', ' ').title()}:* ${format_currency_amount(bucket_data['total_usd'])}")
+            lines.append(f"{emoji} <b>{bucket_name.replace('_', ' ').title()}:</b> ${format_currency_amount(bucket_data['total_usd'])}")
             
             for account in bucket_data["accounts"]:
                 account_name = account["account_name"]
@@ -131,7 +131,7 @@ async def command_capital(message: Message):
         
         # Форматируем и отправляем
         formatted = format_capital_state(state_data)
-        await message.answer(formatted, parse_mode="Markdown")
+        await message.answer(formatted, parse_mode="HTML")
         
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
@@ -284,18 +284,18 @@ async def process_bucket(callback_query, state: FSMContext):
     bucket_emoji = bucket_emojis.get(bucket, "•")
     
     confirm_text = (
-        f"*Подтвердите данные:*\n\n"
-        f"• *Счёт:* {account_name}\n"
-        f"• *Баланс:* {balance:,.2f} {currency}\n"
+        f"<b>Подтвердите данные:</b>\n\n"
+        f"• <b>Счёт:</b> {account_name}\n"
+        f"• <b>Баланс:</b> {balance:,.2f} {currency}\n"
     )
-    
+
     if currency not in ["USD", "USDT"]:
-        confirm_text += f"• *Курс {currency}/USD:* {fx_rate}\n"
-    
+        confirm_text += f"• <b>Курс {currency}/USD:</b> {fx_rate}\n"
+
     confirm_text += (
-        f"• *Категория:* {bucket_emoji} {bucket.replace('_', ' ').title()}\n"
-        f"• *Баланс в USD:* ${balance_usd:,.2f}\n"
-        f"• *Дата:* {date.today().isoformat()}\n\n"
+        f"• <b>Категория:</b> {bucket_emoji} {bucket.replace('_', ' ').title()}\n"
+        f"• <b>Баланс в USD:</b> ${balance_usd:,.2f}\n"
+        f"• <b>Дата:</b> {date.today().isoformat()}\n\n"
         f"Всё верно?"
     )
     
@@ -307,7 +307,7 @@ async def process_bucket(callback_query, state: FSMContext):
     
     await callback_query.message.edit_text(
         confirm_text,
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=keyboard.as_markup()
     )
     await state.set_state(CapitalAddStates.confirm)
@@ -343,15 +343,15 @@ async def process_confirm(callback_query, state: FSMContext):
         # Формируем сообщение об успехе
         balance_usd = response["balance_usd"]
         success_text = (
-            f"✅ *Счёт успешно сохранён!*\n\n"
+            f"✅ <b>Счёт успешно сохранён!</b>\n\n"
             f"• {data['account_name']}: ${balance_usd:,.2f}\n"
             f"• Дата: {date.today().strftime('%d %B %Y')}\n\n"
             f"Используй /capital чтобы увидеть обновлённое состояние капитала."
         )
-        
+
         await callback_query.message.edit_text(
             success_text,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         
     except Exception as e:
@@ -437,10 +437,10 @@ async def process_edit_balance(message: Message, state: FSMContext):
         
         # Показываем подтверждение
         confirm_text = (
-            f"*Подтвердите обновление:*\n\n"
-            f"• *Счёт:* {account_name}\n"
-            f"• *Новый баланс:* {new_balance:,.2f} USD\n"
-            f"• *Дата:* {date.today().isoformat()}\n\n"
+            f"<b>Подтвердите обновление:</b>\n\n"
+            f"• <b>Счёт:</b> {account_name}\n"
+            f"• <b>Новый баланс:</b> {new_balance:,.2f} USD\n"
+            f"• <b>Дата:</b> {date.today().isoformat()}\n\n"
             f"Обновить запись?"
         )
         
@@ -451,7 +451,7 @@ async def process_edit_balance(message: Message, state: FSMContext):
         
         await message.answer(
             confirm_text,
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=keyboard.as_markup()
         )
         await state.set_state(CapitalEditStates.confirm)
@@ -486,15 +486,15 @@ async def process_edit_confirm(callback_query, state: FSMContext):
         # Формируем сообщение об успехе
         balance_usd = response["balance_usd"]
         success_text = (
-            f"✅ *Счёт успешно обновлён!*\n\n"
+            f"✅ <b>Счёт успешно обновлён!</b>\n\n"
             f"• {edit_data['account_name']}: ${balance_usd:,.2f}\n"
             f"• Дата: {date.today().strftime('%d %B %Y')}\n\n"
             f"Используй /capital чтобы увидеть обновлённое состояние капитала."
         )
-        
+
         await callback_query.message.edit_text(
             success_text,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         
     except Exception as e:
@@ -547,9 +547,9 @@ async def command_positions(message: Message):
             by_date[as_of_date].append(pos)
         
         # Формируем сообщение
-        lines = ["📊 *Позиции портфеля*"]
+        lines = ["📊 <b>Позиции портфеля</b>"]
         for date_str, pos_list in sorted(by_date.items(), reverse=True):
-            lines.append(f"\n*{date_str}*")
+            lines.append(f"\n<b>{date_str}</b>")
             total_usd = sum(p["market_value_usd"] for p in pos_list)
             lines.append(f"Всего: ${total_usd:,.2f}")
             for pos in pos_list:
@@ -558,8 +558,8 @@ async def command_positions(message: Message):
                     f"{pos['quantity']} × ${pos['market_value_usd']/pos['quantity']:,.2f} = "
                     f"${pos['market_value_usd']:,.2f} ({pos['asset_type']})"
                 )
-        
-        await message.answer("\n".join(lines), parse_mode="Markdown")
+
+        await message.answer("\n".join(lines), parse_mode="HTML")
         
     except Exception as e:
         logger.error(f"Error fetching positions: {e}")
@@ -570,9 +570,9 @@ async def command_positions(message: Message):
 async def command_position_add(message: Message, state: FSMContext):
     """Начать добавление позиции портфеля"""
     await message.answer(
-        "📝 *Добавление позиции портфеля*\n\n"
+        "📝 <b>Добавление позиции портфеля</b>\n\n"
         "Введите название счёта (например, IBKR, Bybit, Trust Wallet):",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     await state.set_state(PositionAddStates.account_name)
 
@@ -685,13 +685,13 @@ async def process_position_as_of_date(message: Message, state: FSMContext):
     # Показать подтверждение
     data = await state.get_data()
     confirm_text = (
-        f"*Подтвердите добавление позиции:*\n\n"
-        f"• *Счёт:* {data['account_name']}\n"
-        f"• *Актив:* {data['asset_symbol']}\n"
-        f"• *Количество:* {data['quantity']}\n"
-        f"• *Стоимость:* {data['market_value']} {data['currency']}\n"
-        f"• *Курс к USD:* {data.get('fx_rate', 1.0)}\n"
-        f"• *Дата:* {data['as_of_date']}\n\n"
+        f"<b>Подтвердите добавление позиции:</b>\n\n"
+        f"• <b>Счёт:</b> {data['account_name']}\n"
+        f"• <b>Актив:</b> {data['asset_symbol']}\n"
+        f"• <b>Количество:</b> {data['quantity']}\n"
+        f"• <b>Стоимость:</b> {data['market_value']} {data['currency']}\n"
+        f"• <b>Курс к USD:</b> {data.get('fx_rate', 1.0)}\n"
+        f"• <b>Дата:</b> {data['as_of_date']}\n\n"
         f"Сохранить позицию?"
     )
     
@@ -702,7 +702,7 @@ async def process_position_as_of_date(message: Message, state: FSMContext):
     
     await message.answer(
         confirm_text,
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=keyboard.as_markup()
     )
     await state.set_state(PositionAddStates.confirm)
@@ -734,17 +734,17 @@ async def process_position_confirm(callback_query, state: FSMContext):
         response = await call_api("/capital/position", method="POST", json_data=position_data)
         
         success_text = (
-            f"✅ *Позиция добавлена!*\n\n"
+            f"✅ <b>Позиция добавлена!</b>\n\n"
             f"• {response['account_name']} – {response['asset_symbol']}\n"
             f"• Тип: {response['asset_type']}\n"
             f"• Ликвидность: {response['liquidity_bucket']}\n"
             f"• Стоимость в USD: ${response['market_value_usd']:,.2f}\n\n"
             f"Используй /positions чтобы увидеть все позиции."
         )
-        
+
         await callback_query.message.edit_text(
             success_text,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         
     except Exception as e:

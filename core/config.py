@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     owner_chat_id: int | None = None  # для еженедельного дайджеста
     api_port: int = 8002  # порт для API (используется ботом)
 
+    # Backup settings
+    backup_s3_bucket: str = ""
+    backup_s3_region: str = ""
+    backup_s3_access_key: str = ""
+    backup_s3_secret_key: str = ""
+    backup_s3_endpoint: str = ""
+    backup_prefix: str = "cfo-brain/backups"
+
     @validator("owner_chat_id", pre=True)
     def empty_string_to_none(cls, v):
         if v == "":

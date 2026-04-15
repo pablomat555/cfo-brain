@@ -7,6 +7,12 @@ services:
       - CFO_DB_URL=${CFO_DB_URL:-sqlite:////app/data/cfo.db}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-}
+      - BACKUP_S3_ACCESS_KEY=${BACKUP_S3_ACCESS_KEY:-}
+      - BACKUP_S3_SECRET_KEY=${BACKUP_S3_SECRET_KEY:-}
+      - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}
+      - BACKUP_PREFIX=${BACKUP_PREFIX:-cfo-brain/backups}
     volumes:
       - cfo_data:/app/data
       - ./accounts.yml:/app/accounts.yml:ro
@@ -28,11 +34,50 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - OWNER_CHAT_ID=${OWNER_CHAT_ID}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-}
+      - BACKUP_S3_ACCESS_KEY=${BACKUP_S3_ACCESS_KEY:-}
+      - BACKUP_S3_SECRET_KEY=${BACKUP_S3_SECRET_KEY:-}
+      - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}
+      - BACKUP_PREFIX=${BACKUP_PREFIX:-cfo-brain/backups}
     depends_on:
       cfo_api:
         condition: service_healthy
     volumes:
       - ./accounts.yml:/app/accounts.yml:ro
+    restart: unless-stopped
+
+  cfo_backup:
+    build: .
+    command: >
+      sh -c "
+        echo 'Backup service started. Waiting for API to be healthy...' &&
+        sleep 30 &&
+        while true; do
+          echo 'Running scheduled backup at $$(date)' &&
+          python scripts/backup.py &&
+          echo 'Backup completed, sleeping 24 hours' &&
+          sleep 86400
+        done
+      "
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - CFO_DB_URL=${CFO_DB_URL:-sqlite:////app/data/cfo.db}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-}
+      - BACKUP_S3_ACCESS_KEY=${BACKUP_S3_ACCESS_KEY:-}
+      - BACKUP_S3_SECRET_KEY=${BACKUP_S3_SECRET_KEY:-}
+      - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}
+      - BACKUP_PREFIX=${BACKUP_PREFIX:-cfo-brain/backups}
+    volumes:
+      - cfo_data:/app/data
+      - ./accounts.yml:/app/accounts.yml:ro
+      - ./logs:/app/logs
+    depends_on:
+      cfo_api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

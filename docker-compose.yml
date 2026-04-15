@@ -61,6 +61,7 @@ services:
         done
       "
     environment:
+      - PYTHONPATH=/app
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - CFO_DB_URL=${CFO_DB_URL:-sqlite:////app/data/cfo.db}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}

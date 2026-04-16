@@ -1,0 +1,93 @@
+{
+  "commands": {
+    "start": "👋 Привет! Я CFO Brain — твой персональный финансовый директор.\n\n📊 **Как работать со мной:**\n1. Экспортируй транзакции из банковского приложения в CSV\n2. Отправь мне CSV файл\n3. Я проанализирую твои расходы и доходы\n\n📁 **Формат CSV:** Должен содержать колонки:\nDate, Description, Category, Payee, Tag, Account, Transfer Account, Amount\n\n⚡ **Доступные команды:**\n/start — это сообщение\n/status — статус системы\n/report — финансовый отчёт (автоопределение периода из последнего CSV)\n/report YYYY-MM — отчёт за конкретный месяц (например, /report 2026-03)\n\nОтправь мне CSV файл чтобы начать!",
+    "status_api_ok": "✅ **Статус системы:**\n• API: Работает\n• Состояние: {status}\n• Версия: 0.1.0",
+    "status_api_down": "❌ **API не отвечает**\nПроверьте, запущен ли сервис.",
+    "status_api_connect_error": "❌ **Не могу подключиться к API**\nСервис может быть не запущен.",
+    "status_error": "❌ **Ошибка:** {error}",
+    "report_prompt": "💱 Укажи курс USD/UAH для конвертации\n(или /skip для раздельного отчёта)\n\nПример: 41.5 (означает $1 = ₴41.5)\nИли отправь /skip чтобы получить раздельный отчёт по валютам",
+    "report_error": "❌ **Ошибка:** {error}",
+    "report_fetch_error": "❌ **Не удалось получить отчёт**\nПроверьте, запущен ли сервис.",
+    "report_cancel": "❌ Запрос отчёта отменён.",
+    "rate_invalid_format": "❌ **Неверный формат курса.**\nВведите число (например, 41.5 или 41,5) или /skip для раздельного отчёта",
+    "rate_positive_required": "Курс должен быть положительным числом"
+  },
+  "capital": {
+    "state_no_snapshot": "Нет снимка капитала. Используй /capital_add",
+    "state_error": "Ошибка при получении данных: {status_code}",
+    "state_generic_error": "Произошла ошибка при получении состояния капитала",
+    "add_account_prompt": "Пожалуйста, введите корректное название счёта:",
+    "add_account_confirmed": "Счёт: {account_name}\nВведите баланс (число):",
+    "add_balance_positive": "Баланс должен быть положительным числом. Введите снова:",
+    "add_balance_invalid": "Пожалуйста, введите корректное число (например: 4200 или 180000):",
+    "add_fx_rate_positive": "Курс должен быть положительным числом. Введите снова:",
+    "add_fx_rate_invalid": "Пожалуйста, введите корректное число (например: 43.85):",
+    "edit_no_accounts": "Нет доступных счетов для редактирования. Сначала добавьте счёт через /capital_add",
+    "edit_error": "Произошла ошибка при получении списка счетов",
+    "edit_balance_positive": "Баланс должен быть положительным числом. Введите снова:",
+    "cancel_no_process": "Нет активного процесса для отмены.",
+    "positions_empty": "📭 Нет позиций портфеля. Добавьте первую через /position_add",
+    "positions_error": "❌ Ошибка при получении позиций: {error}",
+    "position_add_account_prompt": "Введите символ актива (например, BTC, USDT, VOO):",
+    "position_add_quantity_prompt": "Введите количество (например, 0.5):",
+    "position_add_quantity_positive": "Количество должно быть положительным. Введите снова:",
+    "position_add_quantity_invalid": "Пожалуйста, введите корректное число:",
+    "position_add_market_value_prompt": "Введите рыночную стоимость (в валюте актива):",
+    "position_add_market_value_positive": "Стоимость должна быть положительной. Введите снова:",
+    "position_add_market_value_invalid": "Пожалуйста, введите корректное число:",
+    "position_add_fx_rate_positive": "Курс должен быть положительным. Введите снова:",
+    "position_add_fx_rate_invalid": "Пожалуйста, введите корректное число:",
+    "position_add_date_invalid": "Неверный формат даты. Используйте YYYY-MM-DD:"
+  },
+  "csv_upload": {
+    "analyzing": "⏳ Анализирую файл...",
+    "preview_error": "❌ Ошибка анализа файла. Попробуй ещё раз.",
+    "api_connect_error": "❌ Не могу подключиться к API. Убедитесь, что сервис запущен.",
+    "processing_error": "❌ Ошибка обработки файла. Попробуй ещё раз.",
+    "upload_no_fx": "⏳ Загружаю файл без конвертации валют...",
+    "fx_rate_positive": "❌ Курс должен быть положительным числом. Попробуйте снова.",
+    "upload_with_fx": "⏳ Загружаю файл с курсом {fx_rate} UAH/USD...",
+    "fx_rate_invalid": "❌ Неверный формат курса. Введите число (например, 39.5) или используйте /skip."
+  },
+  "digest": {
+    "forming": "📊 Формирую дайджест...",
+    "error": "❌ Ошибка при формировании дайджеста: {error}"
+  },
+  "observer": {
+    "anomalies_search": "🔍 Ищу аномалии...",
+    "anomalies_error": "❌ **Ошибка:** {error}",
+    "trends_analysis": "📈 Анализирую тренды...",
+    "trends_error": "❌ **Ошибка:** {error}"
+  },
+  "runway": {
+    "header": "📊 Runway Analysis",
+    "self_sustaining": "✅ Статус: SELF-SUSTAINING\nТекущий cash flow положительный — капитал растёт.",
+    "depleting_header": "⏳ Runway до emergency floor (${emergency_floor:.0f}): {runway_months} мес",
+    "depleting_zero": "💀 Runway до нуля: {runway_months_liquid_zero} мес",
+    "warning": "⚠️ Предупреждение: {warning}",
+    "capital": "💰 Liquid: ~${capital_snapshot:.0f} ({as_of})",
+    "burn": "🔥 Avg burn: ${burn_rate_avg:.0f}/мес ({months_used} мес)",
+    "income": "💵 Avg доход: ${income_avg:.0f}/мес",
+    "delta_positive": "📈 Delta: +${monthly_delta:.0f}/мес",
+    "delta_negative": "📉 Delta: -${monthly_delta_abs:.0f}/мес",
+    "trend": "📉 Тренд расходов: {burn_trend}",
+    "emergency_floor": "🛡 Emergency floor: ${emergency_floor:.0f}",
+    "no_data": "⚠️ Нет данных для расчёта runway.\nЗагрузи CSV с указанием курса (/ingest) или добавь капитал (/capital_add).",
+    "error": "❌ Ошибка: {error}"
+  },
+  "verdict": {
+    "header": "💡 Вердикт: {decision}",
+    "category": "📋 Категория: {category} ({expense_type})",
+    "amount": "💵 Сумма: ${amount}",
+    "liquidity_before": "📊 Ликвидность до: ~${value}",
+    "liquidity_after": "📊 Ликвидность после: ~${value}",
+    "impact": "⚠️ Impact: {level} ({pct}%)",
+    "liquidity_warning_yes": "🔔 Предупреждение о ликвидности: да",
+    "liquidity_warning_no": "🔔 Предупреждение о ликвидности: нет",
+    "snapshot_date": "📅 Capital snapshot: {date}",
+    "capital_state_empty": "⚠️ Capital State не загружен. Используй /capital_add.",
+    "error": "❌ Ошибка: {error}",
+    "usage": "Использование: /verdict <сумма> <категория> [тип расхода]\n\nПримеры:\n  /verdict 500 стоматология exceptional\n  /verdict 1500 инвестиции strategic\n  /verdict 200 продукты",
+    "invalid_amount": "❌ Неверная сумма. Введите число."
+  }
+}

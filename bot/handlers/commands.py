@@ -7,6 +7,8 @@ from aiogram.fsm.state import State, StatesGroup
 from loguru import logger
 from datetime import datetime, timedelta
 
+from bot.i18n import i18n as t
+
 router = Router()
 
 
@@ -18,21 +20,7 @@ class ReportStates(StatesGroup):
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Обработчик команды /start"""
-    welcome_text = (
-        "👋 Привет! Я CFO Brain — твой персональный финансовый директор.\n\n"
-        "📊 **Как работать со мной:**\n"
-        "1. Экспортируй транзакции из банковского приложения в CSV\n"
-        "2. Отправь мне CSV файл\n"
-        "3. Я проанализирую твои расходы и доходы\n\n"
-        "📁 **Формат CSV:** Должен содержать колонки:\n"
-        "Date, Description, Category, Payee, Tag, Account, Transfer Account, Amount\n\n"
-        "⚡ **Доступные команды:**\n"
-        "/start — это сообщение\n"
-        "/status — статус системы\n"
-        "/report — финансовый отчёт (автоопределение периода из последнего CSV)\n"
-        "/report YYYY-MM — отчёт за конкретный месяц (например, /report 2026-03)\n\n"
-        "Отправь мне CSV файл чтобы начать!"
-    )
+    welcome_text = t("commands.start")
     await message.reply(welcome_text, parse_mode="Markdown")
 
 
@@ -45,20 +33,15 @@ async def cmd_status(message: types.Message):
             
             if response.status_code == 200:
                 status_data = response.json()
-                status_text = (
-                    f"✅ **Статус системы:**\n"
-                    f"• API: Работает\n"
-                    f"• Состояние: {status_data.get('status', 'unknown')}\n"
-                    f"• Версия: 0.1.0"
-                )
+                status_text = t("commands.status_api_ok", status=status_data.get('status', 'unknown'))
             else:
-                status_text = "❌ **API не отвечает**\nПроверьте, запущен ли сервис."
+                status_text = t("commands.status_api_down")
                 
     except httpx.ConnectError:
-        status_text = "❌ **Не могу подключиться к API**\nСервис может быть не запущен."
+        status_text = t("commands.status_api_connect_error")
     except Exception as e:
         logger.error(f"Error checking status: {e}")
-        status_text = f"❌ **Ошибка:** {str(e)}"
+        status_text = t("commands.status_error", error=str(e))
     
     await message.reply(status_text, parse_mode="Markdown")
 
@@ -80,15 +63,13 @@ async def cmd_report(message: types.Message, state: FSMContext):
         # Переходим в состояние ожидания курса
         await state.set_state(ReportStates.waiting_for_rate)
         await message.reply(
-            "💱 Укажи курс USD/UAH для конвертации\n(или /skip для раздельного отчёта)\n\n"
-            "Пример: 41.5 (означает $1 = ₴41.5)\n"
-            "Или отправь /skip чтобы получить раздельный отчёт по валютам",
+            t("commands.report_prompt"),
             parse_mode="Markdown"
         )
         
     except Exception as e:
         logger.error(f"Error in cmd_report: {e}")
-        await message.reply(f"❌ **Ошибка:** {str(e)}", parse_mode="Markdown")
+        await message.reply(t("commands.report_error", error=str(e)), parse_mode="Markdown")
 
 
 @router.message(Command("skip"), StateFilter(ReportStates.waiting_for_rate))
@@ -111,14 +92,14 @@ async def cmd_skip_rate(message: types.Message, state: FSMContext):
             reply_text = format_split_report(report, period_name)
             await message.reply(reply_text, parse_mode="Markdown")
         else:
-            await message.reply("❌ **Не удалось получить отчёт**\nПроверьте, запущен ли сервис.", parse_mode="Markdown")
+            await message.reply(t("commands.report_fetch_error"), parse_mode="Markdown")
         
         # Сбрасываем состояние
         await state.clear()
         
     except Exception as e:
         logger.error(f"Error in cmd_skip_rate: {e}\n{traceback.format_exc()}")
-        await message.reply(f"❌ **Ошибка:** {str(e)}", parse_mode="Markdown")
+        await message.reply(t("commands.report_error", error=str(e)), parse_mode="Markdown")
         await state.clear()
 
 
@@ -126,7 +107,7 @@ async def cmd_skip_rate(message: types.Message, state: FSMContext):
 async def cmd_cancel_rate(message: types.Message, state: FSMContext):
     """Обработчик команды /cancel - отмена запроса отчёта"""
     await state.clear()
-    await message.reply("❌ Запрос отчёта отменён.", parse_mode="Markdown")
+    await message.reply(t("commands.report_cancel"), parse_mode="Markdown")
 
 
 @router.message(F.text, StateFilter(ReportStates.waiting_for_rate))
@@ -141,7 +122,7 @@ async def process_rate_input(message: types.Message, state: FSMContext):
             if rate <= 0:
                 raise ValueError("Курс должен быть положительным числом")
         except ValueError:
-            await message.reply("❌ **Неверный формат курса.**\nВведите число (например, 41.5 или 41,5) или /skip для раздельного отчёта", parse_mode="Markdown")
+            await message.reply(t("commands.rate_invalid_format"), parse_mode="Markdown")
             return
         
         data = await state.get_data()

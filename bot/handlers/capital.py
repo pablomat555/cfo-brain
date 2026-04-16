@@ -10,6 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from loguru import logger
 
 from core.config import get_settings
+from bot.i18n import i18n as t
 
 router = Router()
 settings = get_settings()
@@ -136,12 +137,12 @@ async def command_capital(message: Message):
         
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            await message.answer("Нет снимка капитала. Используй /capital_add")
+            await message.answer(t("capital.state_no_snapshot"))
         else:
-            await message.answer(f"Ошибка при получении данных: {e.response.status_code}")
+            await message.answer(t("capital.state_error", status_code=e.response.status_code))
     except Exception as e:
         logger.error(f"Error in /capital command: {e}")
-        await message.answer("Произошла ошибка при получении состояния капитала")
+        await message.answer(t("capital.state_generic_error"))
 
 
 # Команда /capital_add - начало FSM
@@ -161,11 +162,11 @@ async def command_capital_add(message: Message, state: FSMContext):
 async def process_account_name(message: Message, state: FSMContext):
     account_name = message.text.strip()
     if not account_name:
-        await message.answer("Пожалуйста, введите корректное название счёта:")
+        await message.answer(t("capital.add_account_prompt"))
         return
-    
+
     await state.update_data(account_name=account_name)
-    await message.answer(f"Счёт: {account_name}\nВведите баланс (число):")
+    await message.answer(t("capital.add_account_confirmed", account_name=account_name))
     await state.set_state(CapitalAddStates.balance)
 
 
@@ -175,7 +176,7 @@ async def process_balance(message: Message, state: FSMContext):
     try:
         balance = float(message.text.replace(",", "."))
         if balance <= 0:
-            await message.answer("Баланс должен быть положительным числом. Введите снова:")
+            await message.answer(t("capital.add_balance_positive"))
             return
         
         await state.update_data(balance=balance)
@@ -194,7 +195,7 @@ async def process_balance(message: Message, state: FSMContext):
         await state.set_state(CapitalAddStates.currency)
         
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число (например: 4200 или 180000):")
+        await message.answer(t("capital.add_balance_invalid"))
 
 
 # Шаг 3: currency (обработка callback)
@@ -224,14 +225,14 @@ async def process_fx_rate(message: Message, state: FSMContext):
     try:
         fx_rate = float(message.text.replace(",", "."))
         if fx_rate <= 0:
-            await message.answer("Курс должен быть положительным числом. Введите снова:")
+            await message.answer(t("capital.add_fx_rate_positive"))
             return
         
         await state.update_data(fx_rate=fx_rate)
         await ask_bucket(message, state)
         
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число (например: 43.85):")
+        await message.answer(t("capital.add_fx_rate_invalid"))
 
 
 def get_bucket_keyboard():
@@ -375,7 +376,7 @@ async def command_capital_edit(message: Message, state: FSMContext):
         accounts = response.get("accounts", [])
         
         if not accounts:
-            await message.answer("Нет доступных счетов для редактирования. Сначала добавьте счёт через /capital_add")
+            await message.answer(t("capital.edit_no_accounts"))
             return
         
         # Создаём клавиатуру со счетами
@@ -392,7 +393,7 @@ async def command_capital_edit(message: Message, state: FSMContext):
         
     except Exception as e:
         logger.error(f"Error in /capital_edit command: {e}")
-        await message.answer("Произошла ошибка при получении списка счетов")
+        await message.answer(t("capital.edit_error"))
 
 
 # Шаг 1: select_account (обработка callback)
@@ -417,7 +418,7 @@ async def process_edit_balance(message: Message, state: FSMContext):
     try:
         new_balance = float(message.text.replace(",", "."))
         if new_balance <= 0:
-            await message.answer("Баланс должен быть положительным числом. Введите снова:")
+            await message.answer(t("capital.edit_balance_positive"))
             return
         
         data = await state.get_data()
@@ -458,7 +459,7 @@ async def process_edit_balance(message: Message, state: FSMContext):
         await state.set_state(CapitalEditStates.confirm)
         
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число (например: 4200 или 180000):")
+        await message.answer(t("capital.add_balance_invalid"))
 
 
 # Шаг 3: confirm (обработка callback)
@@ -514,7 +515,7 @@ async def command_cancel(message: Message, state: FSMContext):
     """Отменить текущий FSM процесс"""
     current_state = await state.get_state()
     if current_state is None:
-        await message.answer("Нет активного процесса для отмены.")
+        await message.answer(t("capital.cancel_no_process"))
         return
     
     await state.clear()
@@ -536,7 +537,7 @@ async def command_positions(message: Message):
         positions = response.get("positions", [])
         
         if not positions:
-            await message.answer("📭 Нет позиций портфеля. Добавьте первую через /position_add")
+            await message.answer(t("capital.positions_empty"))
             return
         
         # Группируем по дате
@@ -564,7 +565,7 @@ async def command_positions(message: Message):
         
     except Exception as e:
         logger.error(f"Error fetching positions: {e}")
-        await message.answer(f"❌ Ошибка при получении позиций: {str(e)}")
+        await message.answer(t("capital.positions_error", error=str(e)))
 
 
 @router.message(Command("position_add"))
@@ -581,14 +582,14 @@ async def command_position_add(message: Message, state: FSMContext):
 @router.message(PositionAddStates.account_name)
 async def process_position_account_name(message: Message, state: FSMContext):
     await state.update_data(account_name=message.text.strip())
-    await message.answer("Введите символ актива (например, BTC, USDT, VOO):")
+    await message.answer(t("capital.position_add_account_prompt"))
     await state.set_state(PositionAddStates.asset_symbol)
 
 
 @router.message(PositionAddStates.asset_symbol)
 async def process_position_asset_symbol(message: Message, state: FSMContext):
     await state.update_data(asset_symbol=message.text.strip().upper())
-    await message.answer("Введите количество (например, 0.5):")
+    await message.answer(t("capital.position_add_quantity_prompt"))
     await state.set_state(PositionAddStates.quantity)
 
 
@@ -597,13 +598,13 @@ async def process_position_quantity(message: Message, state: FSMContext):
     try:
         quantity = float(message.text.replace(",", "."))
         if quantity <= 0:
-            await message.answer("Количество должно быть положительным. Введите снова:")
+            await message.answer(t("capital.position_add_quantity_positive"))
             return
         await state.update_data(quantity=quantity)
-        await message.answer("Введите рыночную стоимость (в валюте актива):")
+        await message.answer(t("capital.position_add_market_value_prompt"))
         await state.set_state(PositionAddStates.market_value)
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число:")
+        await message.answer(t("capital.position_add_quantity_invalid"))
 
 
 @router.message(PositionAddStates.market_value)
@@ -611,7 +612,7 @@ async def process_position_market_value(message: Message, state: FSMContext):
     try:
         market_value = float(message.text.replace(",", "."))
         if market_value <= 0:
-            await message.answer("Стоимость должна быть положительной. Введите снова:")
+            await message.answer(t("capital.position_add_market_value_positive"))
             return
         await state.update_data(market_value=market_value)
         
@@ -627,7 +628,7 @@ async def process_position_market_value(message: Message, state: FSMContext):
         )
         await state.set_state(PositionAddStates.currency)
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число:")
+        await message.answer(t("capital.position_add_market_value_invalid"))
 
 
 @router.callback_query(PositionAddStates.currency, F.data.startswith("currency_"))
@@ -658,7 +659,7 @@ async def process_position_fx_rate(message: Message, state: FSMContext):
     try:
         fx_rate = float(message.text.replace(",", "."))
         if fx_rate <= 0:
-            await message.answer("Курс должен быть положительным. Введите снова:")
+            await message.answer(t("capital.position_add_fx_rate_positive"))
             return
         await state.update_data(fx_rate=fx_rate)
         await message.answer(
@@ -666,7 +667,7 @@ async def process_position_fx_rate(message: Message, state: FSMContext):
         )
         await state.set_state(PositionAddStates.as_of_date)
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число:")
+        await message.answer(t("capital.position_add_fx_rate_invalid"))
 
 
 @router.message(PositionAddStates.as_of_date)
@@ -678,7 +679,7 @@ async def process_position_as_of_date(message: Message, state: FSMContext):
             datetime.strptime(message.text, "%Y-%m-%d")
             as_of_date = message.text
         except ValueError:
-            await message.answer("Неверный формат даты. Используйте YYYY-MM-DD:")
+            await message.answer(t("capital.position_add_date_invalid"))
             return
     
     await state.update_data(as_of_date=as_of_date)

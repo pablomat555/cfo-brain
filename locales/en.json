@@ -1,0 +1,93 @@
+{
+  "commands": {
+    "start": "👋 Hello! I'm CFO Brain — your personal financial director.\n\n📊 **How to work with me:**\n1. Export transactions from your banking app as CSV\n2. Send me the CSV file\n3. I'll analyze your income and expenses\n\n📁 **CSV format:** Must contain columns:\nDate, Description, Category, Payee, Tag, Account, Transfer Account, Amount\n\n⚡ **Available commands:**\n/start — this message\n/status — system status\n/report — financial report (auto‑detect period from last CSV)\n/report YYYY-MM — report for a specific month (e.g., /report 2026-03)\n\nSend me a CSV file to get started!",
+    "status_api_ok": "✅ **System status:**\n• API: Running\n• State: {status}\n• Version: 0.1.0",
+    "status_api_down": "❌ **API not responding**\nCheck if the service is running.",
+    "status_api_connect_error": "❌ **Cannot connect to API**\nService may be down.",
+    "status_error": "❌ **Error:** {error}",
+    "report_prompt": "💱 Enter USD/UAH exchange rate for conversion\n(or /skip for split report)\n\nExample: 41.5 (means $1 = ₴41.5)\nOr send /skip to get a split report by currency",
+    "report_error": "❌ **Error:** {error}",
+    "report_fetch_error": "❌ **Failed to fetch report**\nCheck if the service is running.",
+    "report_cancel": "❌ Report request cancelled.",
+    "rate_invalid_format": "❌ **Invalid rate format.**\nEnter a number (e.g., 41.5 or 41,5) or /skip for split report",
+    "rate_positive_required": "Rate must be a positive number"
+  },
+  "capital": {
+    "state_no_snapshot": "No capital snapshot. Use /capital_add",
+    "state_error": "Error fetching data: {status_code}",
+    "state_generic_error": "An error occurred while fetching capital state",
+    "add_account_prompt": "Please enter a valid account name:",
+    "add_account_confirmed": "Account: {account_name}\nEnter balance (number):",
+    "add_balance_positive": "Balance must be a positive number. Enter again:",
+    "add_balance_invalid": "Please enter a valid number (e.g., 4200 or 180000):",
+    "add_fx_rate_positive": "Exchange rate must be a positive number. Enter again:",
+    "add_fx_rate_invalid": "Please enter a valid number (e.g., 43.85):",
+    "edit_no_accounts": "No accounts available for editing. First add an account via /capital_add",
+    "edit_error": "An error occurred while fetching account list",
+    "edit_balance_positive": "Balance must be a positive number. Enter again:",
+    "cancel_no_process": "No active process to cancel.",
+    "positions_empty": "📭 No portfolio positions. Add first via /position_add",
+    "positions_error": "❌ Error fetching positions: {error}",
+    "position_add_account_prompt": "Enter asset symbol (e.g., BTC, USDT, VOO):",
+    "position_add_quantity_prompt": "Enter quantity (e.g., 0.5):",
+    "position_add_quantity_positive": "Quantity must be positive. Enter again:",
+    "position_add_quantity_invalid": "Please enter a valid number:",
+    "position_add_market_value_prompt": "Enter market value (in asset currency):",
+    "position_add_market_value_positive": "Value must be positive. Enter again:",
+    "position_add_market_value_invalid": "Please enter a valid number:",
+    "position_add_fx_rate_positive": "Exchange rate must be positive. Enter again:",
+    "position_add_fx_rate_invalid": "Please enter a valid number:",
+    "position_add_date_invalid": "Invalid date format. Use YYYY-MM-DD:"
+  },
+  "csv_upload": {
+    "analyzing": "⏳ Analyzing file...",
+    "preview_error": "❌ File analysis error. Try again.",
+    "api_connect_error": "❌ Cannot connect to API. Make sure the service is running.",
+    "processing_error": "❌ File processing error. Try again.",
+    "upload_no_fx": "⏳ Uploading file without currency conversion...",
+    "fx_rate_positive": "❌ Rate must be a positive number. Try again.",
+    "upload_with_fx": "⏳ Uploading file with rate {fx_rate} UAH/USD...",
+    "fx_rate_invalid": "❌ Invalid rate format. Enter a number (e.g., 39.5) or use /skip."
+  },
+  "digest": {
+    "forming": "📊 Generating digest...",
+    "error": "❌ Error generating digest: {error}"
+  },
+  "observer": {
+    "anomalies_search": "🔍 Looking for anomalies...",
+    "anomalies_error": "❌ **Error:** {error}",
+    "trends_analysis": "📈 Analyzing trends...",
+    "trends_error": "❌ **Error:** {error}"
+  },
+  "runway": {
+    "header": "📊 Runway Analysis",
+    "self_sustaining": "✅ Status: SELF‑SUSTAINING\nCurrent cash flow positive — capital is growing.",
+    "depleting_header": "⏳ Runway to emergency floor (${emergency_floor:.0f}): {runway_months} months",
+    "depleting_zero": "💀 Runway to zero: {runway_months_liquid_zero} months",
+    "warning": "⚠️ Warning: {warning}",
+    "capital": "💰 Liquid: ~${capital_snapshot:.0f} ({as_of})",
+    "burn": "🔥 Avg burn: ${burn_rate_avg:.0f}/month ({months_used} months)",
+    "income": "💵 Avg income: ${income_avg:.0f}/month",
+    "delta_positive": "📈 Delta: +${monthly_delta:.0f}/month",
+    "delta_negative": "📉 Delta: -${monthly_delta_abs:.0f}/month",
+    "trend": "📉 Expense trend: {burn_trend}",
+    "emergency_floor": "🛡 Emergency floor: ${emergency_floor:.0f}",
+    "no_data": "⚠️ No data for runway calculation.\nUpload CSV with exchange rate (/ingest) or add capital (/capital_add).",
+    "error": "❌ Error: {error}"
+  },
+  "verdict": {
+    "header": "💡 Verdict: {decision}",
+    "category": "📋 Category: {category} ({expense_type})",
+    "amount": "💵 Amount: ${amount}",
+    "liquidity_before": "📊 Liquidity before: ~${value}",
+    "liquidity_after": "📊 Liquidity after: ~${value}",
+    "impact": "⚠️ Impact: {level} ({pct}%)",
+    "liquidity_warning_yes": "🔔 Liquidity warning: yes",
+    "liquidity_warning_no": "🔔 Liquidity warning: no",
+    "snapshot_date": "📅 Capital snapshot: {date}",
+    "capital_state_empty": "⚠️ Capital State not loaded. Use /capital_add.",
+    "error": "❌ Error: {error}",
+    "usage": "Usage: /verdict <amount> <category> [expense_type]\n\nExamples:\n  /verdict 500 dentistry exceptional\n  /verdict 1500 investments strategic\n  /verdict 200 groceries",
+    "invalid_amount": "❌ Invalid amount. Enter a number."
+  }
+}

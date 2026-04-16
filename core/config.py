@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = None
     owner_chat_id: int | None = None  # для еженедельного дайджеста
     api_port: int = 8002  # порт для API (используется ботом)
+    language: str = Field(default="ru", env="LANGUAGE")  # i18n language (ru/en)
 
     # Backup settings
     backup_s3_bucket: str = ""

@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from loguru import logger
 
 from core.config import get_settings
+from bot.i18n import i18n as t
 
 
 class CSVUploadState(StatesGroup):

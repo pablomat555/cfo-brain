@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from loguru import logger
 
 from core.database import init_db
-from api.routers import ingest, report, observer, capital, verdict
+from api.routers import ingest, report, observer, capital, verdict, runway
 
 app = FastAPI(title="CFO Brain API", version="0.1.0")
 
@@ -12,6 +12,7 @@ app.include_router(report.router)
 app.include_router(observer.router)
 app.include_router(capital.router)
 app.include_router(verdict.router)
+app.include_router(runway.router)
 
 
 @app.on_event("startup")

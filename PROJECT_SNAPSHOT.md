@@ -1,12 +1,12 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 15 апреля 2026, 21:27 (Kyiv)
+Последнее обновление: 16 апреля 2026, 23:00 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
 - **Owner:** Я
 - **Repo:** git@github.com:pablomat555/cfo-brain.git
 - **Стек:** Python · aiogram 3.x · FastAPI · SQLite · Docker Compose · Doppler
-- **Текущая фаза:** Phase 3 АКТИВНА (Capital Snapshot MVP deployed)
+- **Текущая фаза:** Phase 4 АКТИВНА (i18n + runway hotfixes)
 
 ## 2. Архитектура
 - **Flow:** Telegram → Bot Gateway → CFO Brain API → ETL Pipeline → SQLite → Response
@@ -128,11 +128,15 @@
 - ✅ **WAR MODE фикс #2 — Markdown → HTML** — все 8 мест в `capital.py` с `parse_mode="Markdown"` переведены на `parse_mode="HTML"`. Динамические поля (account_name, asset_symbol, liquidity_bucket) содержали символы ломающие Markdown парсер Telegram. Коммит `0b3a61b`.
 - ✅ **WAR MODE фикс #3 — field mismatch в /capital** — `format_capital_state` читал поля `balance_usd`/`balance`, API отдаёт `value_usd`/`market_value`. KeyError устранён, добавлен `asset_symbol` в строку для читаемости. Коммит `33931f3`.
 - ✅ **Phase 4, Task #2 — i18n Migration: digest, observer, runway, verdict** — добавлены недостающие ключи в locales, мигрированы все оставшиеся хендлеры на `t()` систему, smoke test PASS, DECISION_LOG.md и PROJECT_SNAPSHOT.md обновлены.
+- ✅ **WAR MODE — runway parse_mode fix** — убраны `parse_mode="Markdown"` в `runway.py`: `str(e)` ломал Telegram Markdown парсер (`_` в трассировке). Коммит `851a6c2`.
+- ✅ **WAR MODE — runway router не зарегистрирован** — `api/main.py` не содержал `runway` в import/include_router. Незакоммиченное изменение. Коммит `bae22dc`.
+- ✅ **WAR MODE — runway файлы не в репо** — `api/routers/runway.py` и `analytics/runway_engine.py` были untracked → ImportError на VPS. Коммит `011d114`. Правило добавлено в AGENT.md.
 
 ## 5. Фокус сессии
-- **Цель:** WAR MODE — три production-фикса в bot/handlers/capital.py
-- **Last Commit:** `33931f3` fix: format_capital_state — balance_usd/balance → value_usd/market_value
-- **Git Status:** Все изменения закоммичены и запушены, CI/CD деплой выполнен, контейнеры работают
+- **Цель:** Phase 4 Task #1 (i18n Loader) + WAR MODE три runway hotfixes
+- **Last Commit:** `e3ffd8f` docs(agent): add git status pre-deploy rule
+- **Git Status:** Все изменения закоммичены и запушены, контейнеры работают
+- **Состояние VPS:** `GET /runway` → 200 `self_sustaining`, все сервисы healthy
 
 ## Следующий шаг
 **Phase 3 АКТИВНА. Task #6 развёрнут и работает.**

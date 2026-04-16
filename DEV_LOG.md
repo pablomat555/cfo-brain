@@ -1,5 +1,49 @@
 # DEV LOG: CFO Brain
-Последнее обновление: 14 апреля 2026, 21:00 (Kyiv)
+Последнее обновление: 16 апреля 2026, 23:00 (Kyiv)
+
+---
+
+## Сессия: Phase 4 Task #1 + WAR MODE runway
+**Дата:** 16 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+Phase 4, Task #1 (i18n Loader) завершён, затем WAR MODE — три последовательных бага при попытке вызвать `/runway` на VPS.
+
+### Phase 4, Task #1 — i18n Loader
+- `bot/i18n.py` создан: `t(key, **kwargs)` с lru_cache, dot-notation, fallback chain (lang → ru → key itself)
+- `locales/ru.json` + `locales/en.json`: строки из commands, capital, csv_upload handlers
+- `core/config.py`: поле `language: str = Field(default="ru", env="LANGUAGE")`
+- `docker-compose.yml`: `LANGUAGE=${LANGUAGE:-ru}` в сервис cfo_bot
+- Smoke test PASS локально и VPS. Запись D-36 добавлена.
+- **Коммит:** `a94682a`
+
+### WAR MODE — Фикс #1: parse_mode=Markdown в runway.py
+**Симптом:** `TelegramBadRequest: Can't find end of entity at byte offset 66`
+**Причина:** `t("runway.error", error=str(e))` с `parse_mode="Markdown"` — `str(e)` содержал `_` из трассировки исключения, что ломало Markdown парсер.
+**Фикс:** Убраны все три `parse_mode="Markdown"` в `bot/handlers/runway.py` — локали используют plain text + emoji, Markdown не нужен.
+**Коммит:** `851a6c2`
+
+### WAR MODE — Фикс #2: runway router не зарегистрирован в api/main.py
+**Симптом:** `GET /runway` → 404, роутер в `app.routes` отсутствовал
+**Причина:** `api/main.py` никогда не обновлялся после создания runway router — `runway` отсутствовал в import и `include_router`. Локальный файл был исправлен, но изменение не закоммичено.
+**Фикс:** Добавлены `from api.routers import ..., runway` и `app.include_router(runway.router)`
+**Коммит:** `bae22dc`
+
+### WAR MODE — Фикс #3: api/routers/runway.py и analytics/runway_engine.py не в репо
+**Симптом:** `ImportError: cannot import name 'runway' from 'api.routers'` — API не поднимался
+**Причина:** Оба файла были untracked — созданы локально, но не закоммичены. Docker собирает образ из репо, не из рабочей директории.
+**Фикс:** `git add api/routers/runway.py analytics/runway_engine.py` + коммит
+**Коммит:** `011d114`
+
+### Результат
+- ✅ `GET /runway` → 200, `self_sustaining`, `monthly_delta: +$1851`
+- ✅ Бот отвечает на `/runway` без ошибок
+- ✅ Правило добавлено в AGENT.md: перед VPS deploy всегда `git status` — untracked файлы не попадают в образ
+
+### Паттерн (для будущих сессий)
+Три разных симптома (Markdown crash → 404 → ImportError) — все вызваны одним корнем: файлы создавались, но не коммитились. VPS всегда видит только то, что в репо.
 
 ---
 
@@ -719,3 +763,88 @@
 - Деплой изменений через CI/CD.
 - Тестирование в production с реальными данными через бота.
 - Переход к Task #4 (Backup стратегия SQLite).
+
+---
+
+## Сессия: Phase 3, Task #4 — SQLite Backup & Restore
+**Дата:** 15 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+Требовалось реализовать надёжную систему бэкапов базы данных cfo.db с автоматическим backup в S3/Backblaze и возможностью восстановления через CLI.
+
+### Выполнено
+1. **Созданы скрипты `backup.py` и `restore.py`** в директории `scripts/`:
+   - `backup.py`: копирование БД, сжатие gzip, загрузка в Backblaze B2 через boto3, логирование через loguru
+   - `restore.py`: скачивание файла из S3, распаковка, валидация SQLite, создание pre-restore backup, подтверждение пользователя (--force)
+2. **Добавлены переменные окружения в `core/config.py`**:
+   - `BACKUP_S3_BUCKET`, `BACKUP_S3_REGION`, `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY`, `BACKUP_S3_ENDPOINT`, `BACKUP_PREFIX`
+3. **Обновлён `docker-compose.yml`**:
+   - Добавлен сервис `cfo_backup` с бесконечным loop (ежедневный backup в 03:00 после ожидания 30 секунд)
+   - Переменные окружения backup добавлены во все сервисы
+   - Исправлен PYTHONPATH для корректного импорта модулей
+4. **Деплой и тестирование в production**:
+   - Подключение к серверу 91.99.2.146 по SSH
+   - Ручной backup успешно создал файл `cfo_20260415_182436.db.gz` в Backblaze B2
+   - Ручной restore корректно восстановил БД с созданием backup перед заменой
+   - API после restore работает (`/health` → `{"status":"ok"}`)
+   - Данные целы (`/report/period` вернул корректные данные)
+   - Автоматический backup запускается при старте сервиса
+
+### Критическая находка (Observation outside scope)
+Контейнеры были запущены без Doppler → S3 credentials не попадали в контейнеры. Правило: всегда `doppler run -- docker compose up -d`. Зафиксировано в DECISION_LOG.md как D-35.
+
+### Результаты
+- ✅ Все 6 пунктов Definition of Done выполнены
+- ✅ Backup система готова к использованию в production
+- ✅ Phase 3 завершена (все задачи выполнены)
+
+### Следующий шаг
+- Переход к Phase 4, Task #1 — i18n (Internationalization)
+
+---
+
+## Сессия: Phase 4, Task #1 — i18n Loader (Zero-Dependency Locale System)
+**Дата:** 16 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО (с известным долгом)
+
+### Контекст
+Реализация системы интернационализации для Telegram бота: вынести все пользовательские строки из хендлеров в JSON файлы локалей, создать loader с кэшированием, добавить поддержку переключения языка через переменную окружения.
+
+### Выполнено
+1. **Создан `bot/i18n.py`** — lru_cache loader с функцией `t(key, **kwargs)`:
+   - Загрузка JSON из `locales/{lang}.json`
+   - Fallback: неизвестный язык → ru, неизвестный ключ → key itself (no crash)
+   - Поддержка плейсхолдеров `{name}` через `str.format()`
+2. **Обновлён `core/config.py`** — добавлено поле `language: str = Field(default="ru", env="LANGUAGE")`
+3. **Созданы файлы локалей**:
+   - `locales/ru.json` — все строки из handlers (команды, capital, csv_upload)
+   - `locales/en.json` — перевод ключей на английский
+4. **Мигрированы строки в 3 основных файлах handlers**:
+   - `bot/handlers/commands.py` — /start, /status, /report
+   - `bot/handlers/capital.py` — /capital, /capital_add, /positions, /position_add
+   - `bot/handlers/csv_upload.py` — загрузка CSV, запрос курса
+5. **Обновлён `docker-compose.yml`** — добавлена переменная `LANGUAGE=${LANGUAGE:-ru}` в сервис cfo_bot
+6. **Smoke test проведён**:
+   - Локально: `LANGUAGE=ru` → русские ответы, `LANGUAGE=en` → английские ответы
+   - VPS: деплой через CI/CD, проверка команд `/start`, `/capital`, `/report`
+   - Неизвестный ключ → возвращает key, не вызывает crash
+7. **Документация обновлена**:
+   - `DECISION_LOG.md` — добавлена запись D-36 (Zero-Dependency Locale Loader)
+   - `PROJECT_SNAPSHOT.md` — Phase 4 Task #1 отмечен как выполненный, Known Issue зафиксирован
+
+### Known Issue (долг для Phase 4 Task #2)
+4 файла handlers (`digest.py`, `observer.py`, `runway.py`, `verdict.py`) используют хардкодные строки (константы типа `MSG_ERROR`), не переведены на `t()`. Это не блокирует работу i18n системы, но ограничивает интернационализацию для этих команд.
+
+### Результаты
+- ✅ i18n система готова к использованию в production
+- ✅ Переключение языка через переменную окружения `LANGUAGE`
+- ✅ Zero runtime dependencies (только стандартная библиотека Python)
+- ✅ Hot-reload через lru_cache.cache_clear() при необходимости
+- ✅ Phase 4 Task #1 выполнен согласно Definition of Done (с оговоркой о долге)
+
+### Следующий шаг
+- Phase 4, Task #2 — миграция оставшихся хендлеров (digest, observer, runway, verdict) на i18n
+- Добавление локалей для других языков (tr, de) по запросу

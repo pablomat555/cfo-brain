@@ -1102,6 +1102,75 @@ USD/USDT остаются без изменений.
 
 ---
 
+## D-34 — Runway Engine: Self-Sustaining Status + Manual-Rate Filter
+
+**Дата:** 14 апреля 2026 (Kyiv)
+**Статус:** ✅ ПРИНЯТО
+
+**Проблема:**
+Runway расчёт должен использовать только совместимые месячные данные. Месяцы с rate_type="skip" (например, когда CSV загружен без указания курса) содержат некорректные суммы в USD и не должны смешиваться с manual-rate месяцами.
+
+**Решение:**
+BurnRateCalculator фильтрует monthly_metrics по rate_type="manual". Если таких месяцев нет — возвращает ошибку "Нет данных для расчёта". Если monthly_delta >= 0 → runway_status="self_sustaining", runway_months=None (никогда не возвращать искусственно большое число месяцев). Симуляция выполняется помесячно, максимум 120 итераций (10 лет горизонт). BurnRateCalculator и RunwayEngine живут в analytics/runway_engine.py. ContextBuilder и StrategyConfig переиспользуются из Task #2 без дублирования.
+
+**Правило:**
+Runway Engine использует только manual-rate месяцы. Положительный cash flow → self_sustaining, отрицательный → depleting с расчётом месяцев до emergency floor и до нуля.
+
+---
+
+## D-35 — SQLite Backup/Restore: Production Test Results
+
+**Дата:** 15 апреля 2026 (Kyiv)
+**Статус:** ✅ ПРИНЯТО
+
+**Контекст:**
+Production тестирование backup/restore системы на VPS Hetzner (91.99.2.146). Проект расположен в `/opt/cfo-brain` (не `/root/cfo-brain`).
+
+**Проблема при тесте:**
+Контейнеры были запущены через `docker compose up` без Doppler → все BACKUP_S3_* переменные пустые → первый backup завершился с ошибкой `BACKUP_S3_BUCKET not set`.
+
+**Решение:**
+Перезапуск через `doppler run -- docker compose up -d`. Все S3 credentials из Doppler проекта `cfo-brain/prd` доступны в контейнерах.
+
+**Результаты:**
+- Backup: ✅ `cfo_20260415_182436.db.gz` успешно загружен в Backblaze bucket `cfo-brain-backups`
+- Restore: ✅ Pre-restore backup создан (`cfo_backup_before_restore.db`), SQLite валидация прошла
+- API: ✅ `/health` → `{"status":"ok"}`, `/report/period` → данные целы
+- Авто-backup: ✅ Первый автоматический backup создан при старте сервиса
+
+**Правило:**
+ВСЕГДА запускать контейнеры через `doppler run -- docker compose up -d`. Прямой `docker compose up` оставляет все секреты пустыми. Backup service использует infinite loop (sleep 86400), не cron — время запуска зависит от момента старта контейнера.
+
+---
+
+## D-36 — i18n Loader: JSON Locales + t() Function
+
+**Дата:** 16 апреля 2026 (Kyiv)
+**Статус:** ✅ ПРИНЯТО
+
+**Контекст:**
+Phase 4, Task #1. Все пользовательские строки были захардкожены в bot/handlers/*.py. Нужна система интернационализации без внешних зависимостей, с fallback и кэшированием.
+
+**Решение:**
+- `bot/i18n.py` — функция `t(key: str, **kwargs) -> str` с `@lru_cache` на загрузку JSON файлов
+- Dot-notation ключи (например, `commands.start`, `capital.state_header`)
+- Fallback chain: запрошенный язык → ru → key itself (никогда не crash)
+- `core/config.py` — добавлено поле `language: str = Field(default="ru", env="LANGUAGE")`
+- `locales/ru.json` и `locales/en.json` — все строки из handlers (commands, capital, csv_upload)
+- `docker-compose.yml` — `LANGUAGE=${LANGUAGE:-ru}` передаётся в cfo_bot контейнер
+
+**Smoke test (локально и VPS PASS):**
+- `t('commands.start')` → полный текст приветствия на русском ✅
+- `t('nonexistent.key')` → `'nonexistent.key'` (passthrough) ✅
+
+**Ограничения:**
+- 4 из 7 хендлеров (`digest.py`, `observer.py`, `runway.py`, `verdict.py`) не мигрированы — используют константы вверху файла. Миграция отложена на следующие итерации.
+
+**Правило:**
+Все новые хендлеры (начиная с Phase 4, Task #2) пишут строки через `t()`, не инлайнят в код.
+
+---
+
 ## Zero-links
 ---
 - [[0 Projects]]

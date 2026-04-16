@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 14 апреля 2026, 20:02 (Kyiv)
+Последнее обновление: 15 апреля 2026, 21:27 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -32,7 +32,7 @@
 
 ## 4. Текущее состояние
 - **Версия:** v0.9-alpha
-- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 АКТИВНА (Capital Snapshot MVP)
+- **Статус:** Phase 1 ЗАВЕРШЁН, Phase 2 ЗАВЕРШЁН, Phase 3 ЗАВЕРШЁН, Phase 4 АКТИВНА
   - Phase 1, Task #1 ЗАВЕРШЁН (базовая структура)
   - Phase 1, Task #2 ЗАВЕРШЁН (AI вердикт + /report эндпоинт)
   - Phase 1, Task #3 ЗАВЕРШЁН (port change 8001 → 8002)
@@ -60,7 +60,9 @@
     - ✅ **Фильтрация технических записей** — добавлена фильтрация Balancing transaction и переводов между счетами
   - **Дополнительные задачи Phase 3:**
     - ✅ **Фикс D-25 (отрицательные суммы в baseline)** — исправлена агрегация расходных категорий, backfill 22 месяцев, аномалии детектируются
-    - ✅ **Restore FX Rate Request in CSV Upload** — восстановлен запрос курса валют при загрузке CSV с UAH транзакциями, добавлен эндпоинт `/ingest/csv/preview`, миграция 005
+    - ✅ **Restore FX Rate Request in CSV Upload** — восстановлен запрос курса валют при загрузке CSV с UAH транзакций, добавлен эндпоинт `/ingest/csv/preview`, миграция 005
+    - ✅ **Backup стратегия SQLite** — реализована система бэкапов БД cfo.db с автоматическим backup в Backblaze B2 и restore через CLI, добавлены скрипты `backup.py` и `restore.py`, сервис `cfo_backup` в docker-compose, переменные окружения в Doppler, протестировано в production (D-35)
+  - Phase 4, Task #1 ✅ ЗАВЕРШЁН (i18n Loader — bot/i18n.py, locales/ru.json+en.json, smoke test PASS, D-36)
 
 ### Что работает
 - ✅ Полная структура repo создана (20+ файлов)
@@ -70,6 +72,7 @@
 - ✅ Bot: aiogram 3.x, обработка команд /start, /status, /report, /anomalies, /trends, /capital, /capital_add, /capital_edit, /position_add, /positions, /position_edit и CSV файлов с запросом курса для UAH транзакций
 - ✅ Docker Compose: два сервиса (cfo_api, cfo_bot) с healthcheck (порт 8002) и named volume `cfo_data`
 - ✅ Doppler integration: переменные окружения инжектятся через environment (TELEGRAM_TOKEN, CFO_DB_URL, OWNER_CHAT_ID, OPENROUTER_API_KEY, LOG_LEVEL)
+- ✅ **Backup система:** Автоматический backup БД cfo.db в Backblaze B2 через скрипты `backup.py` и `restore.py`, сервис `cfo_backup` в docker-compose, переменные окружения в Doppler, протестировано в production (D-35)
 - ✅ Makefile: команды make dev-api (порт 8002), make up, make logs
 - ✅ Уникальный constraint: (date, amount, account, description)
 - ✅ Currency mapping: accounts.yml для маппинга аккаунтов на валюты (13 аккаунтов)
@@ -115,6 +118,7 @@
 - ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
 - ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
 - ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
+- ⚠️ i18n миграция неполная — `digest.py`, `observer.py`, `runway.py`, `verdict.py` используют строки-константы вверху файла, не `t()`. Доделать в Phase 4 Task #2 как предусловие.
 
 ### Recently Closed Issues
 - ✅ **D-32 — FX Conversion: Per-Transaction Currency Check** — исправлен баг агрегации доходов (конвертация только UAH транзакций)
@@ -172,13 +176,12 @@
 ✅ Task #1B — Portfolio Breakdown & Enhanced Capital State
 ✅ Task #2 — Verdict Engine + Capital State (D-10)
 ✅ Task #3 — Runway / Burn Rate симуляция
-⏳ Task #4 — Backup стратегия SQLite
+✅ Task #4 — Backup стратегия SQLite
 ✅ Task #5 — Фикс D-25 (отрицательные суммы в baseline)
 ✅ Task #6 — Restore FX Rate Request in CSV Upload
 
 **Known Issues для Phase 3:**
 - ⚠️ "Balancing transaction" фильтр добавлен но старые данные очищены — нужна перезагрузка
-- ⚠️ Backup стратегия для SQLite volume отсутствует
 - ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
 - ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub
 

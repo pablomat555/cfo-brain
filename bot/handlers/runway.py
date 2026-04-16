@@ -29,16 +29,16 @@ async def cmd_runway(message: types.Message):
         runway_data = await _call_api()
 
         if runway_data is None:
-            await message.reply(t("runway.no_data"), parse_mode="Markdown")
+            await message.reply(t("runway.no_data"))
             return
 
         # Форматируем ответ
         reply_text = _format_runway(runway_data)
-        await message.reply(reply_text, parse_mode="Markdown")
+        await message.reply(reply_text)
 
     except Exception as e:
         logger.error(f"Error in cmd_runway: {e}\n{traceback.format_exc()}")
-        await message.reply(t("runway.error", error=str(e)), parse_mode="Markdown")
+        await message.reply(t("runway.error", error=str(e)))
 
 
 async def _call_api() -> dict | None:

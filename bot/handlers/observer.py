@@ -5,6 +5,8 @@ from aiogram.filters import Command
 from loguru import logger
 from datetime import datetime
 
+from bot.i18n import i18n as t
+
 router = Router()
 
 
@@ -193,23 +195,19 @@ async def cmd_anomalies(message: types.Message):
                 params["month_key"] = month_param
             else:
                 await message.reply(
-                    "❌ Неверный формат месяца. Используйте: `/anomalies YYYY-MM`\n"
-                    "Пример: `/anomalies 2026-03`",
+                    t("observer.invalid_month_format"),
                     parse_mode="Markdown"
                 )
                 return
         
         # Отправляем статус обработки
-        processing_msg = await message.reply("🔍 Ищу аномалии...")
+        processing_msg = await message.reply(t("observer.anomalies_search"))
         
         # Получаем данные из API
         data = await fetch_observer_data("anomalies", params)
         
         if data is None:
-            await processing_msg.edit_text(
-                "❌ Не удалось получить данные от Observer API.\n"
-                "Проверьте, запущен ли сервис cfo_api."
-            )
+            await processing_msg.edit_text(t("observer.api_connect_error"))
             return
         
         # Форматируем и отправляем ответ
@@ -218,7 +216,7 @@ async def cmd_anomalies(message: types.Message):
         
     except Exception as e:
         logger.error(f"Error in cmd_anomalies: {e}\n{traceback.format_exc()}")
-        await message.reply(f"❌ **Ошибка:** {str(e)}", parse_mode="Markdown")
+        await message.reply(t("observer.anomalies_error", error=str(e)), parse_mode="Markdown")
 
 
 @router.message(Command("trends"))
@@ -237,29 +235,25 @@ async def cmd_trends(message: types.Message):
                     params["months"] = months_param
                 else:
                     await message.reply(
-                        "❌ Количество месяцев должно быть от 1 до 12.\n"
-                        "Используйте: `/trends 6`",
+                        t("observer.invalid_months_range"),
                         parse_mode="Markdown"
                     )
                     return
             except ValueError:
                 await message.reply(
-                    "❌ Неверный параметр. Используйте: `/trends 6` (число месяцев)",
+                    t("observer.invalid_parameter"),
                     parse_mode="Markdown"
                 )
                 return
         
         # Отправляем статус обработки
-        processing_msg = await message.reply("📈 Анализирую тренды...")
+        processing_msg = await message.reply(t("observer.trends_analysis"))
         
         # Получаем данные из API
         data = await fetch_observer_data("trends", params)
         
         if data is None:
-            await processing_msg.edit_text(
-                "❌ Не удалось получить данные от Observer API.\n"
-                "Проверьте, запущен ли сервис cfo_api."
-            )
+            await processing_msg.edit_text(t("observer.api_connect_error"))
             return
         
         # Форматируем и отправляем ответ
@@ -268,4 +262,4 @@ async def cmd_trends(message: types.Message):
         
     except Exception as e:
         logger.error(f"Error in cmd_trends: {e}\n{traceback.format_exc()}")
-        await message.reply(f"❌ **Ошибка:** {str(e)}", parse_mode="Markdown")
+        await message.reply(t("observer.trends_error", error=str(e)), parse_mode="Markdown")

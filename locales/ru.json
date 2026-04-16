@@ -57,7 +57,11 @@
     "anomalies_search": "🔍 Ищу аномалии...",
     "anomalies_error": "❌ **Ошибка:** {error}",
     "trends_analysis": "📈 Анализирую тренды...",
-    "trends_error": "❌ **Ошибка:** {error}"
+    "trends_error": "❌ **Ошибка:** {error}",
+    "api_connect_error": "❌ Не удалось получить данные от Observer API.\nПроверьте, запущен ли сервис cfo_api.",
+    "invalid_month_format": "❌ Неверный формат месяца. Используйте: `/anomalies YYYY-MM`\nПример: `/anomalies 2026-03`",
+    "invalid_months_range": "❌ Количество месяцев должно быть от 1 до 12.\nИспользуйте: `/trends 6`",
+    "invalid_parameter": "❌ Неверный параметр. Используйте: `/trends 6` (число месяцев)"
   },
   "runway": {
     "header": "📊 Runway Analysis",

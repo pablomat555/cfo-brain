@@ -57,7 +57,11 @@
     "anomalies_search": "🔍 Looking for anomalies...",
     "anomalies_error": "❌ **Error:** {error}",
     "trends_analysis": "📈 Analyzing trends...",
-    "trends_error": "❌ **Error:** {error}"
+    "trends_error": "❌ **Error:** {error}",
+    "api_connect_error": "❌ Could not fetch data from Observer API.\nCheck if the cfo_api service is running.",
+    "invalid_month_format": "❌ Invalid month format. Use: `/anomalies YYYY-MM`\nExample: `/anomalies 2026-03`",
+    "invalid_months_range": "❌ Number of months must be between 1 and 12.\nUse: `/trends 6`",
+    "invalid_parameter": "❌ Invalid parameter. Use: `/trends 6` (number of months)"
   },
   "runway": {
     "header": "📊 Runway Analysis",

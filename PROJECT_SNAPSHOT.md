@@ -118,7 +118,6 @@
 - ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
 - ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
 - ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
-- ⚠️ i18n миграция неполная — `digest.py`, `observer.py`, `runway.py`, `verdict.py` используют строки-константы вверху файла, не `t()`. Доделать в Phase 4 Task #2 как предусловие.
 
 ### Recently Closed Issues
 - ✅ **D-32 — FX Conversion: Per-Transaction Currency Check** — исправлен баг агрегации доходов (конвертация только UAH транзакций)
@@ -128,6 +127,7 @@
 - ✅ **WAR MODE фикс #1 — API_BASE_URL** — `bot/handlers/capital.py` использовал `localhost:8002` вместо `cfo_api:8002`, бот не мог достучаться до API (`All connection attempts failed`). Коммит `0a2df86`.
 - ✅ **WAR MODE фикс #2 — Markdown → HTML** — все 8 мест в `capital.py` с `parse_mode="Markdown"` переведены на `parse_mode="HTML"`. Динамические поля (account_name, asset_symbol, liquidity_bucket) содержали символы ломающие Markdown парсер Telegram. Коммит `0b3a61b`.
 - ✅ **WAR MODE фикс #3 — field mismatch в /capital** — `format_capital_state` читал поля `balance_usd`/`balance`, API отдаёт `value_usd`/`market_value`. KeyError устранён, добавлен `asset_symbol` в строку для читаемости. Коммит `33931f3`.
+- ✅ **Phase 4, Task #2 — i18n Migration: digest, observer, runway, verdict** — добавлены недостающие ключи в locales, мигрированы все оставшиеся хендлеры на `t()` систему, smoke test PASS, DECISION_LOG.md и PROJECT_SNAPSHOT.md обновлены.
 
 ## 5. Фокус сессии
 - **Цель:** WAR MODE — три production-фикса в bot/handlers/capital.py
@@ -201,3 +201,25 @@ Scope:
   вверху файла, не инлайнят в код
 
 Оценка: L2, ~1 день работы
+
+## Phase 4, Task #2 — i18n Migration: digest, observer, runway, verdict
+
+Цель: завершить миграцию всех оставшихся хендлеров на i18n систему.
+
+Scope:
+- Добавить недостающие ключи для observer (`api_connect_error`, `invalid_month_format`, `invalid_months_range`, `invalid_parameter`) в `locales/ru.json` и `locales/en.json`
+- Мигрировать `bot/handlers/digest.py` (2 строки) — заменить на `t("digest.forming")`, `t("digest.error")`
+- Мигрировать `bot/handlers/observer.py` (6 строк) — заменить на `t("observer.anomalies_search")`, `t("observer.trends_analysis")`, `t("observer.api_connect_error")`, `t("observer.invalid_month_format")`, `t("observer.invalid_months_range")`, `t("observer.invalid_parameter")`
+- Мигрировать `bot/handlers/runway.py` (14 строк) — удалить блок констант MSG_*, заменить на `t()` вызовы в `_format_runway()`
+- Мигрировать `bot/handlers/verdict.py` (12 строк) — удалить блок констант MSG_*, заменить на `t()` вызовы в `cmd_verdict` и `_format_verdict`
+- Smoke test команд на VPS: `/digest`, `/anomalies`, `/trends`, `/runway`, `/verdict`
+- Обновить DECISION_LOG.md (D-36) и PROJECT_SNAPSHOT.md
+
+Результат:
+- ✅ Все пользовательские строки в боте используют `t()` с dot-notation
+- ✅ Ключи присутствуют в обоих языках (ru, en)
+- ✅ Smoke test (локальный импорт + проверка ключей) PASS
+- ✅ DECISION_LOG.md обновлён
+- ✅ PROJECT_SNAPSHOT.md обновлён (удалён known issue о неполной миграции)
+
+Статус: ✅ ВЫПОЛНЕНО (16 апреля 2026)

@@ -18,30 +18,9 @@ from aiogram import types, Router, F
 from aiogram.filters import Command
 from loguru import logger
 
+from bot.i18n import i18n as t
+
 router = Router()
-
-# ─────────────────────────────────────────────
-# Строки (константы)
-# ─────────────────────────────────────────────
-
-MSG_VERDICT_HEADER = "💡 Вердикт: {decision}"
-MSG_CATEGORY = "📋 Категория: {category} ({expense_type})"
-MSG_AMOUNT = "💵 Сумма: ${amount}"
-MSG_LIQUIDITY_BEFORE = "📊 Ликвидность до: ~${value}"
-MSG_LIQUIDITY_AFTER = "📊 Ликвидность после: ~${value}"
-MSG_IMPACT = "⚠️ Impact: {level} ({pct}%)"
-MSG_LIQUIDITY_WARNING_YES = "🔔 Предупреждение о ликвидности: да"
-MSG_LIQUIDITY_WARNING_NO = "🔔 Предупреждение о ликвидности: нет"
-MSG_SNAPSHOT_DATE = "📅 Capital snapshot: {date}"
-MSG_CAPITAL_STATE_EMPTY = "⚠️ Capital State не загружен. Используй /capital_add."
-MSG_ERROR = "❌ Ошибка: {error}"
-MSG_USAGE = (
-    "Использование: /verdict <сумма> <категория> [тип расхода]\n\n"
-    "Примеры:\n"
-    "/verdict 500 стоматология exceptional\n"
-    "/verdict 1500 инвестиции strategic\n"
-    "/verdict 200 продукты"
-)
 
 # API URL
 _API_URL = "http://cfo_api:8002/verdict"
@@ -54,7 +33,7 @@ async def cmd_verdict(message: types.Message):
         # Парсим аргументы
         parts = message.text.strip().split()
         if len(parts) < 3:
-            await message.reply(MSG_USAGE, parse_mode="Markdown")
+            await message.reply(t("verdict.usage"), parse_mode="Markdown")
             return
 
         amount_str = parts[1]
@@ -65,14 +44,14 @@ async def cmd_verdict(message: types.Message):
         try:
             amount = float(amount_str)
         except ValueError:
-            await message.reply("❌ Неверная сумма. Введите число.", parse_mode="Markdown")
+            await message.reply(t("verdict.invalid_amount"), parse_mode="Markdown")
             return
 
         # Вызываем API
         verdict_data = await _call_api(amount, category, expense_type)
 
         if verdict_data is None:
-            await message.reply(MSG_CAPITAL_STATE_EMPTY, parse_mode="Markdown")
+            await message.reply(t("verdict.capital_state_empty"), parse_mode="Markdown")
             return
 
         # Форматируем ответ
@@ -81,7 +60,7 @@ async def cmd_verdict(message: types.Message):
 
     except Exception as e:
         logger.error(f"Error in cmd_verdict: {e}\n{traceback.format_exc()}")
-        await message.reply(MSG_ERROR.format(error=str(e)), parse_mode="Markdown")
+        await message.reply(t("verdict.error", error=str(e)), parse_mode="Markdown")
 
 
 async def _call_api(amount: float, category: str, expense_type: str) -> dict | None:
@@ -145,17 +124,17 @@ def _format_verdict(data: dict, amount: float, category: str, expense_type: str)
 
     # Собираем ответ
     lines = [
-        MSG_VERDICT_HEADER.format(decision=decision_display),
+        t("verdict.header", decision=decision_display),
         "",
-        MSG_CATEGORY.format(category=category, expense_type=expense_type),
-        MSG_AMOUNT.format(amount=amount_formatted),
+        t("verdict.category", category=category, expense_type=expense_type),
+        t("verdict.amount", amount=amount_formatted),
         "",
-        MSG_LIQUIDITY_BEFORE.format(value=liquid_before_formatted),
-        MSG_LIQUIDITY_AFTER.format(value=capital_after_formatted),
-        MSG_IMPACT.format(level=impact_level, pct=impact_pct_formatted),
-        MSG_LIQUIDITY_WARNING_YES if liquidity_warning else MSG_LIQUIDITY_WARNING_NO,
+        t("verdict.liquidity_before", value=liquid_before_formatted),
+        t("verdict.liquidity_after", value=capital_after_formatted),
+        t("verdict.impact", level=impact_level, pct=impact_pct_formatted),
+        t("verdict.liquidity_warning_yes") if liquidity_warning else t("verdict.liquidity_warning_no"),
         "",
-        MSG_SNAPSHOT_DATE.format(date=snapshot_date_formatted),
+        t("verdict.snapshot_date", date=snapshot_date_formatted),
     ]
 
     return "\n".join(lines)

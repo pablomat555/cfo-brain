@@ -1164,10 +1164,16 @@ Phase 4, Task #1. Все пользовательские строки были 
 - `t('nonexistent.key')` → `'nonexistent.key'` (passthrough) ✅
 
 **Ограничения:**
-- 4 из 7 хендлеров (`digest.py`, `observer.py`, `runway.py`, `verdict.py`) не мигрированы — используют константы вверху файла. Миграция отложена на следующие итерации.
+- ~~4 из 7 хендлеров (`digest.py`, `observer.py`, `runway.py`, `verdict.py`) не мигрированы — используют константы вверху файла. Миграция отложена на следующие итерации.~~ **ВЫПОЛНЕНО в Phase 4, Task #2 (16 апреля 2026).**
 
 **Правило:**
 Все новые хендлеры (начиная с Phase 4, Task #2) пишут строки через `t()`, не инлайнят в код.
+
+**Обновление (Phase 4, Task #2):**
+- Добавлены ключи для `observer` (`api_connect_error`, `invalid_month_format`, `invalid_months_range`, `invalid_parameter`) в `locales/ru.json` и `locales/en.json`
+- Мигрированы все оставшиеся хендлеры: `digest.py` (2 строки), `observer.py` (6 строк), `runway.py` (14 строк), `verdict.py` (12 строк)
+- Все пользовательские строки теперь используют `t()` с dot-notation
+- Smoke test (локальный импорт + проверка ключей) PASS
 
 ---
 

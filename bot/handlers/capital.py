@@ -491,7 +491,7 @@ async def process_input_value_callback(callback_query, state: FSMContext):
         # Проверяем, нужен ли шаг FxRateInput
         if value in ("USD", "USDT"):
             # Пропускаем шаг FxRateInput, переходим к Confirm
-            await prepare_confirm(callback_query.message, state)
+            await prepare_confirm(callback_query.message, state, edit=True)
         else:
             # Запрашиваем курс
             await callback_query.message.edit_text(
@@ -500,7 +500,7 @@ async def process_input_value_callback(callback_query, state: FSMContext):
             await state.set_state(CapitalEditStates.FxRateInput)
     elif field == "bucket":
         await state.update_data(new_bucket=value)
-        await prepare_confirm(callback_query.message, state)
+        await prepare_confirm(callback_query.message, state, edit=True)
     else:
         # Не должно случиться
         pass
@@ -558,7 +558,7 @@ async def process_fx_rate_input(message: Message, state: FSMContext):
         await message.answer(t("capital.edit.input_value.invalid_number"))
 
 
-async def prepare_confirm(message_or_callback, state: FSMContext):
+async def prepare_confirm(message_or_callback, state: FSMContext, edit: bool = False):
     """Подготовка подтверждения с diff"""
     data = await state.get_data()
     current_account = data.get("current_account", {})
@@ -599,7 +599,7 @@ async def prepare_confirm(message_or_callback, state: FSMContext):
     keyboard.button(text="❌ Отмена", callback_data="edit_confirm_cancel")
     keyboard.adjust(2)
 
-    if hasattr(message_or_callback, "edit_text"):
+    if edit:
         await message_or_callback.edit_text(confirm_text, parse_mode="HTML", reply_markup=keyboard.as_markup())
     else:
         await message_or_callback.answer(confirm_text, parse_mode="HTML", reply_markup=keyboard.as_markup())

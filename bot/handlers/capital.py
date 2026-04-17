@@ -510,6 +510,10 @@ async def process_input_value_callback(callback_query, state: FSMContext):
 
 @router.message(CapitalEditStates.InputValue)
 async def process_input_value_text(message: Message, state: FSMContext):
+    if message.text and message.text.startswith("/"):
+        await state.clear()
+        await command_capital_edit(message, state)
+        return
     data = await state.get_data()
     field = data.get("selected_field")
 
@@ -539,6 +543,10 @@ async def process_input_value_text(message: Message, state: FSMContext):
 # Шаг 4: FxRateInput (только для non-USD/USDT валют)
 @router.message(CapitalEditStates.FxRateInput)
 async def process_fx_rate_input(message: Message, state: FSMContext):
+    if message.text and message.text.startswith("/"):
+        await state.clear()
+        await command_capital_edit(message, state)
+        return
     try:
         fx_rate = float(message.text.replace(",", "."))
         if fx_rate <= 0:

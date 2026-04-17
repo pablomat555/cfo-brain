@@ -327,6 +327,33 @@ class AccountListResponse(BaseModel):
     accounts: List[str]
 
 
+class AccountUpdateRequest(BaseModel):
+    """Pydantic модель для частичного обновления счёта"""
+    balance: float | None = None
+    currency: str | None = None
+    fx_rate: float | None = None
+    bucket: str | None = None
+
+    @validator("currency")
+    def validate_currency_fx_rate(cls, v, values):
+        """Валидатор для currency и fx_rate"""
+        # Если currency отсутствует в payload, валидатор не срабатывает
+        if v is None:
+            return v
+        
+        fx_rate = values.get("fx_rate")
+        
+        # currency in (UAH, EUR) and fx_rate is None → raise ValueError
+        if v in ("UAH", "EUR") and fx_rate is None:
+            raise ValueError(f"fx_rate обязателен для валюты {v}")
+        
+        # currency in (USD, USDT) and fx_rate not in (None, 1.0) → raise ValueError
+        if v in ("USD", "USDT") and fx_rate is not None and fx_rate != 1.0:
+            raise ValueError(f"fx_rate должен быть 1.0 для валюты {v}")
+        
+        return v
+
+
 class CapitalSnapshotIngestResponse(BaseModel):
     """Pydantic модель для ответа API при загрузке снапшота"""
     rows_loaded: int

@@ -25,6 +25,26 @@
     "edit_no_accounts": "No accounts available for editing. First add an account via /capital_add",
     "edit_error": "An error occurred while fetching account list",
     "edit_balance_positive": "Balance must be a positive number. Enter again:",
+    "edit": {
+      "select_account": "Select account to edit:",
+      "select_field": "Editing account: {account_name}\nSelect field to change:",
+      "input_value": {
+        "currency": "Select new currency:",
+        "bucket": "Select new liquidity category:",
+        "balance": "Enter new balance (number):",
+        "fx_rate": "Enter new exchange rate (number):",
+        "balance_positive": "Balance must be a positive number. Enter again:",
+        "fx_rate_positive": "Exchange rate must be a positive number. Enter again:",
+        "invalid_number": "Please enter a valid number."
+      },
+      "input_fx_rate": "Exchange rate {currency}/USD? (e.g., for UAH enter 43.85):",
+      "confirm": "<b>Confirm update:</b>\n\n{diff}\n\nEverything correct?",
+      "saved": "✅ <b>Account successfully updated!</b>\n\n• {account_name}\n\nUse /capital to see updated capital state.",
+      "cancelled": "❌ Editing cancelled.",
+      "not_found": "❌ Account not found.",
+      "error": "❌ An error occurred while updating.",
+      "conflict": "❌ Data conflict (possible duplicate)."
+    },
     "cancel_no_process": "No active process to cancel.",
     "positions_empty": "📭 No portfolio positions. Add first via /position_add",
     "positions_error": "❌ Error fetching positions: {error}",

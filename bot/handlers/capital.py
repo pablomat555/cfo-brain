@@ -27,11 +27,13 @@ class CapitalAddStates(StatesGroup):
     confirm = State()
 
 
-# FSM States для /capital_edit
+# FSM States для /capital_edit (Rev 4)
 class CapitalEditStates(StatesGroup):
-    select_account = State()
-    new_balance = State()
-    confirm = State()
+    SelectAccount = State()
+    SelectField = State()
+    InputValue = State()
+    FxRateInput = State()
+    Confirm = State()
 
 
 # FSM States для /position_add
@@ -366,7 +368,7 @@ async def process_confirm(callback_query, state: FSMContext):
     await callback_query.answer()
 
 
-# Команда /capital_edit - начало FSM
+# Команда /capital_edit - начало FSM (Rev 4)
 @router.message(Command("capital_edit"))
 async def command_capital_edit(message: Message, state: FSMContext):
     """Начать процесс редактирования существующего счёта"""
@@ -374,137 +376,289 @@ async def command_capital_edit(message: Message, state: FSMContext):
         # Получаем список счетов
         response = await call_api("/capital/accounts")
         accounts = response.get("accounts", [])
-        
+
         if not accounts:
             await message.answer(t("capital.edit_no_accounts"))
             return
-        
+
         # Создаём клавиатуру со счетами
         keyboard = InlineKeyboardBuilder()
         for account in accounts:
             keyboard.button(text=account, callback_data=f"edit_account_{account}")
         keyboard.adjust(1)
-        
+
         await message.answer(
-            "Выберите счёт для редактирования:",
+            t("capital.edit.select_account"),
             reply_markup=keyboard.as_markup()
         )
-        await state.set_state(CapitalEditStates.select_account)
-        
+        await state.set_state(CapitalEditStates.SelectAccount)
+
     except Exception as e:
         logger.error(f"Error in /capital_edit command: {e}")
         await message.answer(t("capital.edit_error"))
 
 
-# Шаг 1: select_account (обработка callback)
-@router.callback_query(CapitalEditStates.select_account, F.data.startswith("edit_account_"))
-async def process_edit_account(callback_query, state: FSMContext):
+# Шаг 1: SelectAccount (обработка callback)
+@router.callback_query(CapitalEditStates.SelectAccount, F.data.startswith("edit_account_"))
+async def process_select_account(callback_query, state: FSMContext):
     account_name = callback_query.data.replace("edit_account_", "")
     await state.update_data(account_name=account_name)
-    
-    # TODO: Здесь можно получить текущие данные счёта для отображения
-    # Пока просто запрашиваем новый баланс
+
+    # Получаем текущие данные счёта через API
+    try:
+        response = await call_api(f"/capital/account_by_name?account_name={account_name}")
+        account_data = response.get("account")
+        if account_data:
+            await state.update_data(current_account=account_data)
+    except Exception as e:
+        logger.warning(f"Could not fetch account details: {e}")
+        # Продолжаем без текущих данных
+
+    # Клавиатура выбора поля
+    keyboard = InlineKeyboardBuilder()
+    fields = [
+        ("💰 Баланс", "balance"),
+        ("💱 Валюта", "currency"),
+        ("📊 Курс (fx_rate)", "fx_rate"),
+        ("📦 Категория (bucket)", "bucket")
+    ]
+    for display, field in fields:
+        keyboard.button(text=display, callback_data=f"edit_field_{field}")
+    keyboard.adjust(2)
+
     await callback_query.message.edit_text(
-        f"Редактирование счёта: {account_name}\n"
-        f"Введите новый баланс:"
+        t("capital.edit.select_field", account_name=account_name),
+        reply_markup=keyboard.as_markup()
     )
-    await state.set_state(CapitalEditStates.new_balance)
+    await state.set_state(CapitalEditStates.SelectField)
     await callback_query.answer()
 
 
-# Шаг 2: new_balance
-@router.message(CapitalEditStates.new_balance)
-async def process_edit_balance(message: Message, state: FSMContext):
-    try:
-        new_balance = float(message.text.replace(",", "."))
-        if new_balance <= 0:
-            await message.answer(t("capital.edit_balance_positive"))
-            return
-        
-        data = await state.get_data()
-        account_name = data["account_name"]
-        
-        # TODO: Здесь можно получить остальные данные счёта из БД
-        # Пока используем дефолтные значения
-        edit_data = {
-            "account_name": account_name,
-            "balance": new_balance,
-            "currency": "USD",  # Дефолт
-            "fx_rate": 1.0,     # Дефолт
-            "bucket": "liquid", # Дефолт
-            "as_of_date": date.today().isoformat()
-        }
-        
-        await state.update_data(edit_data=edit_data)
-        
-        # Показываем подтверждение
-        confirm_text = (
-            f"<b>Подтвердите обновление:</b>\n\n"
-            f"• <b>Счёт:</b> {account_name}\n"
-            f"• <b>Новый баланс:</b> {new_balance:,.2f} USD\n"
-            f"• <b>Дата:</b> {date.today().isoformat()}\n\n"
-            f"Обновить запись?"
-        )
-        
-        keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="✅ Обновить", callback_data="edit_confirm_save")
-        keyboard.button(text="❌ Отмена", callback_data="edit_confirm_cancel")
-        keyboard.adjust(2)
-        
-        await message.answer(
-            confirm_text,
-            parse_mode="HTML",
+# Шаг 2: SelectField (обработка callback)
+@router.callback_query(CapitalEditStates.SelectField, F.data.startswith("edit_field_"))
+async def process_select_field(callback_query, state: FSMContext):
+    field = callback_query.data.replace("edit_field_", "")
+    await state.update_data(selected_field=field)
+
+    data = await state.get_data()
+    current_account = data.get("current_account", {})
+
+    if field in ("currency", "bucket"):
+        # Для currency и bucket показываем inline keyboard
+        if field == "currency":
+            keyboard = InlineKeyboardBuilder()
+            currencies = ["USD", "USDT", "UAH", "EUR", "Other"]
+            for curr in currencies:
+                keyboard.button(text=curr, callback_data=f"edit_value_{curr}")
+            keyboard.adjust(3)
+            prompt = t("capital.edit.input_value.currency")
+        else:  # bucket
+            keyboard = InlineKeyboardBuilder()
+            buckets = [
+                ("💧 Liquid", "liquid"),
+                ("🔄 Semi-liquid", "semi_liquid"),
+                ("📈 Investment", "investment")
+            ]
+            for display, bucket_val in buckets:
+                keyboard.button(text=display, callback_data=f"edit_value_{bucket_val}")
+            keyboard.adjust(1)
+            prompt = t("capital.edit.input_value.bucket")
+
+        await callback_query.message.edit_text(
+            prompt,
             reply_markup=keyboard.as_markup()
         )
-        await state.set_state(CapitalEditStates.confirm)
-        
-    except ValueError:
-        await message.answer(t("capital.add_balance_invalid"))
+        await state.set_state(CapitalEditStates.InputValue)
+    else:
+        # Для balance и fx_rate запрашиваем текстовый ввод
+        prompt = t(f"capital.edit.input_value.{field}")
+        await callback_query.message.edit_text(prompt)
+        await state.set_state(CapitalEditStates.InputValue)
+
+    await callback_query.answer()
 
 
-# Шаг 3: confirm (обработка callback)
-@router.callback_query(CapitalEditStates.confirm, F.data.in_(["edit_confirm_save", "edit_confirm_cancel"]))
-async def process_edit_confirm(callback_query, state: FSMContext):
-    if callback_query.data == "edit_confirm_cancel":
-        await callback_query.message.edit_text("❌ Редактирование отменено.")
-        await state.clear()
-        await callback_query.answer()
-        return
-    
-    # Сохраняем данные через API
+# Шаг 3: InputValue (обработка callback для currency/bucket, текстовый ввод для balance/fx_rate)
+@router.callback_query(CapitalEditStates.InputValue, F.data.startswith("edit_value_"))
+async def process_input_value_callback(callback_query, state: FSMContext):
+    value = callback_query.data.replace("edit_value_", "")
     data = await state.get_data()
-    edit_data = data.get("edit_data")
-    
-    if not edit_data:
-        await callback_query.message.edit_text("❌ Ошибка: данные не найдены.")
+    field = data.get("selected_field")
+
+    if field == "currency":
+        await state.update_data(new_currency=value)
+        # Проверяем, нужен ли шаг FxRateInput
+        if value in ("USD", "USDT"):
+            # Пропускаем шаг FxRateInput, переходим к Confirm
+            await prepare_confirm(callback_query.message, state)
+        else:
+            # Запрашиваем курс
+            await callback_query.message.edit_text(
+                t("capital.edit.input_fx_rate", currency=value)
+            )
+            await state.set_state(CapitalEditStates.FxRateInput)
+    elif field == "bucket":
+        await state.update_data(new_bucket=value)
+        await prepare_confirm(callback_query.message, state)
+    else:
+        # Не должно случиться
+        pass
+
+    await callback_query.answer()
+
+
+@router.message(CapitalEditStates.InputValue)
+async def process_input_value_text(message: Message, state: FSMContext):
+    data = await state.get_data()
+    field = data.get("selected_field")
+
+    try:
+        if field == "balance":
+            value = float(message.text.replace(",", "."))
+            if value <= 0:
+                await message.answer(t("capital.edit.input_value.balance_positive"))
+                return
+            await state.update_data(new_balance=value)
+        elif field == "fx_rate":
+            value = float(message.text.replace(",", "."))
+            if value <= 0:
+                await message.answer(t("capital.edit.input_value.fx_rate_positive"))
+                return
+            await state.update_data(new_fx_rate=value)
+        else:
+            await message.answer(t("capital.edit.error"))
+            return
+    except ValueError:
+        await message.answer(t("capital.edit.input_value.invalid_number"))
+        return
+
+    await prepare_confirm(message, state)
+
+
+# Шаг 4: FxRateInput (только для non-USD/USDT валют)
+@router.message(CapitalEditStates.FxRateInput)
+async def process_fx_rate_input(message: Message, state: FSMContext):
+    try:
+        fx_rate = float(message.text.replace(",", "."))
+        if fx_rate <= 0:
+            await message.answer(t("capital.edit.input_value.fx_rate_positive"))
+            return
+        await state.update_data(new_fx_rate=fx_rate)
+        await prepare_confirm(message, state)
+    except ValueError:
+        await message.answer(t("capital.edit.input_value.invalid_number"))
+
+
+async def prepare_confirm(message_or_callback, state: FSMContext):
+    """Подготовка подтверждения с diff"""
+    data = await state.get_data()
+    current_account = data.get("current_account", {})
+    field = data.get("selected_field")
+
+    # Собираем diff
+    diff_lines = []
+    if field == "balance":
+        old = current_account.get("balance", 0)
+        new = data.get("new_balance")
+        diff_lines.append(f"💰 Баланс: {old:,.2f} → {new:,.2f}")
+    elif field == "currency":
+        old = current_account.get("currency", "USD")
+        new = data.get("new_currency")
+        diff_lines.append(f"💱 Валюта: {old} → {new}")
+        # Если есть new_fx_rate, показываем его
+        new_fx = data.get("new_fx_rate")
+        if new_fx is not None:
+            diff_lines.append(f"📊 Курс: {new_fx}")
+    elif field == "fx_rate":
+        old = current_account.get("fx_rate", 1.0)
+        new = data.get("new_fx_rate")
+        diff_lines.append(f"📊 Курс: {old} → {new}")
+    elif field == "bucket":
+        old = current_account.get("bucket", "liquid")
+        new = data.get("new_bucket")
+        bucket_names = {"liquid": "💧 Liquid", "semi_liquid": "🔄 Semi-liquid", "investment": "📈 Investment"}
+        old_display = bucket_names.get(old, old)
+        new_display = bucket_names.get(new, new)
+        diff_lines.append(f"📦 Категория: {old_display} → {new_display}")
+
+    diff_text = "\n".join(diff_lines)
+
+    confirm_text = t("capital.edit.confirm", diff=diff_text)
+
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text="✅ Сохранить", callback_data="edit_confirm_save")
+    keyboard.button(text="❌ Отмена", callback_data="edit_confirm_cancel")
+    keyboard.adjust(2)
+
+    if hasattr(message_or_callback, "edit_text"):
+        await message_or_callback.edit_text(confirm_text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+    else:
+        await message_or_callback.answer(confirm_text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+
+    await state.set_state(CapitalEditStates.Confirm)
+
+
+# Шаг 5: Confirm (обработка callback)
+@router.callback_query(CapitalEditStates.Confirm, F.data.in_(["edit_confirm_save", "edit_confirm_cancel"]))
+async def process_confirm(callback_query, state: FSMContext):
+    if callback_query.data == "edit_confirm_cancel":
+        await callback_query.message.edit_text(t("capital.edit.cancelled"))
         await state.clear()
         await callback_query.answer()
         return
-    
-    try:
-        # Вызываем API для обновления
-        response = await call_api("/capital/account", method="POST", json_data=edit_data)
-        
-        # Формируем сообщение об успехе
-        balance_usd = response["balance_usd"]
-        success_text = (
-            f"✅ <b>Счёт успешно обновлён!</b>\n\n"
-            f"• {edit_data['account_name']}: ${balance_usd:,.2f}\n"
-            f"• Дата: {date.today().strftime('%d %B %Y')}\n\n"
-            f"Используй /capital чтобы увидеть обновлённое состояние капитала."
-        )
 
-        await callback_query.message.edit_text(
-            success_text,
-            parse_mode="HTML"
-        )
-        
+    data = await state.get_data()
+    account_id = data.get("current_account", {}).get("id")
+    if not account_id:
+        await callback_query.message.edit_text(t("capital.edit.not_found"))
+        await state.clear()
+        await callback_query.answer()
+        return
+
+    # Формируем payload для PATCH
+    payload = {}
+    field = data.get("selected_field")
+    if field == "balance":
+        payload["balance"] = data.get("new_balance")
+    elif field == "currency":
+        payload["currency"] = data.get("new_currency")
+        # fx_rate может быть передан отдельно, если был шаг FxRateInput
+        new_fx = data.get("new_fx_rate")
+        if new_fx is not None:
+            payload["fx_rate"] = new_fx
+    elif field == "fx_rate":
+        payload["fx_rate"] = data.get("new_fx_rate")
+    elif field == "bucket":
+        payload["bucket"] = data.get("new_bucket")
+
+    try:
+        # Вызываем PATCH API
+        response = await call_api(f"/capital/account/{account_id}", method="PATCH", json_data=payload)
+
+        # Успех
+        success_text = t("capital.edit.saved", account_name=data.get("account_name"))
+        await callback_query.message.edit_text(success_text, parse_mode="HTML")
+
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 409:
+            await callback_query.message.edit_text(t("capital.edit.conflict"))
+        elif e.response.status_code == 404:
+            await callback_query.message.edit_text(t("capital.edit.not_found"))
+        else:
+            logger.error(f"API error {e.response.status_code}: {e.response.text}")
+            await callback_query.message.edit_text(t("capital.edit.error"))
     except Exception as e:
         logger.error(f"Error updating account via API: {e}")
-        await callback_query.message.edit_text(
-            f"❌ Ошибка при обновлении: {str(e)}"
-        )
-    
+        await callback_query.message.edit_text(t("capital.edit.error"))
+
+    await state.clear()
+    await callback_query.answer()
+
+
+# Отмена FSM по кнопке ❌ (обработка callback)
+@router.callback_query(F.data == "edit_confirm_cancel")
+async def cancel_edit(callback_query, state: FSMContext):
+    await callback_query.message.edit_text(t("capital.edit.cancelled"))
     await state.clear()
     await callback_query.answer()
 

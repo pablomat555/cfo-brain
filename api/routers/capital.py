@@ -10,7 +10,7 @@ from core.models import (
     AccountBalance, PortfolioPosition, AccountBalanceCreate,
     AccountBalanceResponse, CapitalStateResponse, AccountListResponse,
     CapitalSnapshotIngestResponse, PortfolioPositionCreate, PortfolioPositionResponse,
-    PortfolioPositionListResponse
+    PortfolioPositionListResponse, AccountUpdateRequest
 )
 from etl.capital_parser import parse_capital_snapshot_csv
 from core.capital_classifier import classify_asset
@@ -87,6 +87,75 @@ def upsert_account_balance(
         raise HTTPException(status_code=400, detail=f"Invalid date format: {e}")
     except Exception as e:
         logger.error(f"Error upserting account balance: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.patch("/account/{account_id}", response_model=AccountBalanceResponse)
+def update_account_balance(
+    account_id: int,
+    update_data: AccountUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Частичное обновление счёта по ID.
+    """
+    try:
+        # Находим запись
+        account = db.query(AccountBalance).filter(AccountBalance.id == account_id).first()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        # Нормализация fx_rate для USD/USDT
+        if update_data.currency in ("USD", "USDT"):
+            update_data.fx_rate = 1.0
+        elif update_data.currency is not None and update_data.fx_rate is None:
+            # Для других валют fx_rate должен быть указан (валидатор уже проверил)
+            pass
+        
+        # Partial update: обновляем только non-None поля
+        if update_data.balance is not None:
+            account.balance = update_data.balance
+        if update_data.currency is not None:
+            account.currency = update_data.currency
+        if update_data.fx_rate is not None:
+            account.fx_rate = update_data.fx_rate
+        if update_data.bucket is not None:
+            account.bucket = update_data.bucket
+        
+        account.updated_at = datetime.utcnow()
+        
+        try:
+            db.commit()
+            db.refresh(account)
+        except Exception as e:
+            # IntegrityError (например, нарушение уникальности)
+            db.rollback()
+            raise HTTPException(status_code=409, detail=f"Conflict: {str(e)}")
+        
+        # Вычисляем balance_usd для ответа
+        if account.fx_rate != 0:
+            balance_usd = account.balance / account.fx_rate
+        else:
+            balance_usd = 0.0
+        
+        return AccountBalanceResponse(
+            id=account.id,
+            account_name=account.account_name,
+            balance=account.balance,
+            currency=account.currency,
+            fx_rate=account.fx_rate,
+            bucket=account.bucket,
+            as_of_date=account.as_of_date.isoformat(),
+            source=account.source,
+            created_at=account.created_at.isoformat(),
+            updated_at=account.updated_at.isoformat(),
+            balance_usd=balance_usd
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating account balance: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 

@@ -67,6 +67,8 @@ async def call_api(endpoint: str, method: str = "GET", json_data: Dict[str, Any]
                 response = await client.get(url)
             elif method == "POST":
                 response = await client.post(url, json=json_data)
+            elif method == "PATCH":
+                response = await client.patch(url, json=json_data)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             

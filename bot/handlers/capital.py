@@ -382,10 +382,13 @@ async def command_capital_edit(message: Message, state: FSMContext):
             await message.answer(t("capital.edit_no_accounts"))
             return
 
+        # Сохраняем счета в state для быстрого lookup по ID
+        await state.update_data(accounts={str(a["id"]): a for a in accounts})
+
         # Создаём клавиатуру со счетами
         keyboard = InlineKeyboardBuilder()
         for account in accounts:
-            keyboard.button(text=account, callback_data=f"edit_account_{account}")
+            keyboard.button(text=account["account_name"], callback_data=f"edit_account_{account['id']}")
         keyboard.adjust(1)
 
         await message.answer(
@@ -402,18 +405,15 @@ async def command_capital_edit(message: Message, state: FSMContext):
 # Шаг 1: SelectAccount (обработка callback)
 @router.callback_query(CapitalEditStates.SelectAccount, F.data.startswith("edit_account_"))
 async def process_select_account(callback_query, state: FSMContext):
-    account_name = callback_query.data.replace("edit_account_", "")
-    await state.update_data(account_name=account_name)
-
-    # Получаем текущие данные счёта через API
-    try:
-        response = await call_api(f"/capital/account_by_name?account_name={account_name}")
-        account_data = response.get("account")
-        if account_data:
-            await state.update_data(current_account=account_data)
-    except Exception as e:
-        logger.warning(f"Could not fetch account details: {e}")
-        # Продолжаем без текущих данных
+    account_id = callback_query.data.replace("edit_account_", "")
+    data = await state.get_data()
+    account = data.get("accounts", {}).get(account_id)
+    if not account:
+        await callback_query.message.edit_text(t("capital.edit.not_found"))
+        await state.clear()
+        await callback_query.answer()
+        return
+    await state.update_data(account_name=account["account_name"], current_account=account)
 
     # Клавиатура выбора поля
     keyboard = InlineKeyboardBuilder()
@@ -428,7 +428,7 @@ async def process_select_account(callback_query, state: FSMContext):
     keyboard.adjust(2)
 
     await callback_query.message.edit_text(
-        t("capital.edit.select_field", account_name=account_name),
+        t("capital.edit.select_field", account_name=account["account_name"]),
         reply_markup=keyboard.as_markup()
     )
     await state.set_state(CapitalEditStates.SelectField)

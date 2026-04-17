@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Dict, List, Any, Optional
 from sqlalchemy import Column, Integer, Date, String, DateTime, Numeric, UniqueConstraint, Float
 from sqlalchemy.ext.declarative import declarative_base
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, model_validator
 
 Base = declarative_base()
 
@@ -322,9 +322,23 @@ class CapitalStateResponse(BaseModel):
         }
 
 
+class AccountSummary(BaseModel):
+    """Краткая информация о счёте для списка"""
+    id: int
+    account_name: str
+    balance: float
+    currency: str
+    fx_rate: float
+    bucket: str
+    as_of_date: str
+
+    class Config:
+        from_attributes = True
+
+
 class AccountListResponse(BaseModel):
     """Pydantic модель для ответа API со списком счетов"""
-    accounts: List[str]
+    accounts: List[AccountSummary]
 
 
 class AccountUpdateRequest(BaseModel):
@@ -334,24 +348,17 @@ class AccountUpdateRequest(BaseModel):
     fx_rate: float | None = None
     bucket: str | None = None
 
-    @validator("currency")
-    def validate_currency_fx_rate(cls, v, values):
-        """Валидатор для currency и fx_rate"""
-        # Если currency отсутствует в payload, валидатор не срабатывает
+    @model_validator(mode="after")
+    def validate_currency_fx_rate(self):
+        v = self.currency
         if v is None:
-            return v
-        
-        fx_rate = values.get("fx_rate")
-        
-        # currency in (UAH, EUR) and fx_rate is None → raise ValueError
+            return self
+        fx_rate = self.fx_rate
         if v in ("UAH", "EUR") and fx_rate is None:
             raise ValueError(f"fx_rate обязателен для валюты {v}")
-        
-        # currency in (USD, USDT) and fx_rate not in (None, 1.0) → raise ValueError
         if v in ("USD", "USDT") and fx_rate is not None and fx_rate != 1.0:
             raise ValueError(f"fx_rate должен быть 1.0 для валюты {v}")
-        
-        return v
+        return self
 
 
 class CapitalSnapshotIngestResponse(BaseModel):

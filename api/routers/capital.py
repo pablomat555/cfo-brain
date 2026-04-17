@@ -9,8 +9,8 @@ from core.database import get_db
 from core.models import (
     AccountBalance, PortfolioPosition, AccountBalanceCreate,
     AccountBalanceResponse, CapitalStateResponse, AccountListResponse,
-    CapitalSnapshotIngestResponse, PortfolioPositionCreate, PortfolioPositionResponse,
-    PortfolioPositionListResponse, AccountUpdateRequest
+    AccountSummary, CapitalSnapshotIngestResponse, PortfolioPositionCreate,
+    PortfolioPositionResponse, PortfolioPositionListResponse, AccountUpdateRequest
 )
 from etl.capital_parser import parse_capital_snapshot_csv
 from core.capital_classifier import classify_asset
@@ -426,14 +426,34 @@ def get_capital_state(
 @router.get("/accounts", response_model=AccountListResponse)
 def get_accounts_list(db: Session = Depends(get_db)):
     """
-    Получить список уникальных account_name из account_balances
+    Получить список счетов (последняя запись по каждому account_name)
     """
     try:
-        accounts = db.query(AccountBalance.account_name).distinct().all()
-        account_names = [acc[0] for acc in accounts]
-        
-        return AccountListResponse(accounts=account_names)
-        
+        latest = db.query(
+            AccountBalance.account_name,
+            func.max(AccountBalance.as_of_date).label("max_date")
+        ).group_by(AccountBalance.account_name).subquery()
+
+        rows = db.query(AccountBalance).join(
+            latest,
+            (AccountBalance.account_name == latest.c.account_name) &
+            (AccountBalance.as_of_date == latest.c.max_date)
+        ).order_by(AccountBalance.account_name).all()
+
+        accounts = [
+            AccountSummary(
+                id=r.id,
+                account_name=r.account_name,
+                balance=r.balance,
+                currency=r.currency,
+                fx_rate=r.fx_rate,
+                bucket=r.bucket,
+                as_of_date=r.as_of_date.isoformat(),
+            )
+            for r in rows
+        ]
+        return AccountListResponse(accounts=accounts)
+
     except Exception as e:
         logger.error(f"Error getting accounts list: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")

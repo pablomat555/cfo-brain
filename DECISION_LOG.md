@@ -1177,6 +1177,38 @@ Phase 4, Task #1. Все пользовательские строки были 
 
 ---
 
+## D-37 — /capital_edit FSM Bug Fix: State Persistence + prepare_confirm + PATCH Support
+
+**Дата:** 17 апреля 2026 (Kyiv)
+**Статус:** ✅ ПРИНЯТО
+
+**Контекст:**
+Phase 4, Task #3. Команда `/capital_edit` воспроизводила два связанных бага:
+1. Повторный вызов `/capital_edit` не сбрасывал FSM — бот сразу показывал "Введите новый баланс (число):" пропуская список счетов
+2. После ввода числа — "❌ Счёт не найден." вместо подтверждения
+
+**Диагностика (root cause chain):**
+- `prepare_confirm()` использовала `hasattr(msg, "edit_text")` для определения метода отправки. Но `Message` объект в aiogram 3.x имеет `edit_text` в любом контексте — и от бота (callback), и от пользователя (text). Вызов `edit_text` на сообщении пользователя → `TelegramBadRequest: message can't be edited` → FSM зависал в `InputValue` с потерянным `current_account`
+- `/capital/accounts` возвращал `[str]` без `id` → `account_by_name` endpoint не существовал (404) → `current_account` никогда не сохранялся в state → `account_id` был None при PATCH
+- `call_api()` не поддерживал метод `PATCH` → `ValueError: Unsupported method: PATCH`
+
+**Решения:**
+1. `state.clear()` в начале `command_capital_edit` — сброс любого предыдущего FSM состояния
+2. `prepare_confirm(edit: bool = False)` — явный флаг вместо `hasattr`; callback-хендлеры передают `edit=True`, текстовые хендлеры используют `answer()`
+3. `GET /capital/accounts` переписан: возвращает `[{id, account_name, balance, currency, fx_rate, bucket, as_of_date}]` через subquery на max(as_of_date) per account
+4. Добавлена `AccountSummary` Pydantic модель в `core/models.py`
+5. Bot хранит `{id: account}` map в FSM state при открытии `/capital_edit`; keyboard использует числовой `id` в `callback_data`; `process_select_account` читает account из state по id без дополнительного API-вызова
+6. `call_api()` дополнен `elif method == "PATCH": response = await client.patch(url, json=json_data)`
+7. `@validator("currency")` в `AccountUpdateRequest` заменён на `@model_validator(mode="after")` (Pydantic v2 совместимость)
+
+**Правила:**
+- `prepare_confirm` никогда не использует `hasattr` для определения типа сообщения — всегда явный параметр
+- `call_api()` должен поддерживать все HTTP методы используемые в handlers перед их вызовом
+- FSM command-handlers начинаются с `await state.clear()`
+- API list-endpoints возвращают полные объекты с `id`, не просто имена
+
+---
+
 ## Zero-links
 ---
 - [[0 Projects]]

@@ -115,7 +115,7 @@
 - ⚠️ Двойной commit в etl/loader.py (один для upload session, другой для транзакций) — может быть оптимизировано
 - ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
 - ⚠️ Rate type "skip" используется по умолчанию для исторических данных — аналитика с ним ограничена
-- ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
+- ~~⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля~~ ✅ **ЗАКРЫТ D-37** — полный wizard (balance, currency, fx_rate, bucket) задеплоен и работает (17 апреля 2026)
 - ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
 - ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
 
@@ -131,12 +131,13 @@
 - ✅ **WAR MODE — runway parse_mode fix** — убраны `parse_mode="Markdown"` в `runway.py`: `str(e)` ломал Telegram Markdown парсер (`_` в трассировке). Коммит `851a6c2`.
 - ✅ **WAR MODE — runway router не зарегистрирован** — `api/main.py` не содержал `runway` в import/include_router. Незакоммиченное изменение. Коммит `bae22dc`.
 - ✅ **WAR MODE — runway файлы не в репо** — `api/routers/runway.py` и `analytics/runway_engine.py` были untracked → ImportError на VPS. Коммит `011d114`. Правило добавлено в AGENT.md.
+- ✅ **WAR MODE D-37 — /capital_edit FSM полный фикс** — четыре связанных бага: `state.clear()` при старте, `prepare_confirm edit=True/False`, API `/capital/accounts` с id, `PATCH` в `call_api()`. Коммиты `ee11a72`, `289cede`, `50841ff`, `9ae0f64`, `4795a89`. D-37 зафиксирован.
 
 ## 5. Фокус сессии
-- **Цель:** Phase 4 Task #1 (i18n Loader) + WAR MODE три runway hotfixes
-- **Last Commit:** `e3ffd8f` docs(agent): add git status pre-deploy rule
+- **Цель:** Phase 4, Task #3 — /capital_edit Full Wizard + WAR MODE фиксы FSM
+- **Last Commit:** `4795a89` fix(bot): add PATCH support to call_api
 - **Git Status:** Все изменения закоммичены и запушены, контейнеры работают
-- **Состояние VPS:** `GET /runway` → 200 `self_sustaining`, все сервисы healthy
+- **Состояние VPS:** `/capital_edit` wizard работает (balance, currency, fx_rate, bucket), PATCH успешен, все сервисы healthy
 
 ## Следующий шаг
 **Phase 3 АКТИВНА. Task #6 развёрнут и работает.**
@@ -186,7 +187,7 @@
 
 **Known Issues для Phase 3:**
 - ⚠️ "Balancing transaction" фильтр добавлен но старые данные очищены — нужна перезагрузка
-- ⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля (currency, fx_rate, bucket) — требуется доработка в Task #1B
+- ~~⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля~~ ✅ **ЗАКРЫТ D-37** — полный wizard (balance, currency, fx_rate, bucket) задеплоен и работает (17 апреля 2026)
 - ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub
 
 ## Phase 4, Task #1 — i18n (Internationalization)

@@ -848,3 +848,73 @@ Phase 4, Task #1 (i18n Loader) завершён, затем WAR MODE — три 
 ### Следующий шаг
 - Phase 4, Task #2 — миграция оставшихся хендлеров (digest, observer, runway, verdict) на i18n
 - Добавление локалей для других языков (tr, de) по запросу
+---
+
+## Сессия: Phase 4, Task #3 WAR MODE — /capital_edit FSM Bug Fix (D-37)
+**Дата:** 17 апреля 2026
+**Участники:** Orchestrator, Engineer
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+После деплоя `/capital_edit` Full Wizard (Rev 4) воспроизводились два связанных бага:
+1. Повторный `/capital_edit` пропускал список счетов → сразу "Введите новый баланс (число):"
+2. После ввода числа → "❌ Счёт не найден."
+
+### Диагностика (root cause chain)
+Оба бага имели одну первопричину: `prepare_confirm()` использовала `hasattr(msg, "edit_text")` для выбора метода отправки. В aiogram 3.x `Message` объект имеет `edit_text` в любом контексте — и callback (editable), и user message (not editable). Вызов `edit_text` на сообщении пользователя → `TelegramBadRequest: message can't be edited` → FSM зависал в `InputValue`.
+
+Дополнительно обнаружены:
+- `/capital/accounts` возвращал `[str]` без id; эндпоинт `account_by_name` не существовал (404)
+- `call_api()` не поддерживал метод `PATCH`
+- `@validator` в `AccountUpdateRequest` несовместим с Pydantic v2
+
+### Выполнено
+
+**Фикс 1 — state.clear() при старте wizard:**
+```python
+async def command_capital_edit(message, state):
+    await state.clear()  # добавлено первой строкой
+```
+
+**Фикс 2 — prepare_confirm явный флаг:**
+```python
+async def prepare_confirm(msg, state, edit: bool = False):
+    if edit:
+        await msg.edit_text(...)  # только из callback-хендлеров
+    else:
+        await msg.answer(...)    # из текстовых хендлеров
+```
+
+**Фикс 3 — API /capital/accounts с id:**
+- Добавлена `AccountSummary` Pydantic модель
+- Endpoint переписан: subquery на max(as_of_date) per account, возвращает полные объекты
+- Bot хранит `{id: account}` map в FSM state, keyboard использует числовой id
+
+**Фикс 4 — PATCH в call_api():**
+```python
+elif method == "PATCH":
+    response = await client.patch(url, json=json_data)
+```
+
+**Фикс 5 — model_validator:**
+```python
+@model_validator(mode="after")  # вместо @validator("currency")
+def validate_currency_fx_rate(self): ...
+```
+
+### Коммиты
+- `ee11a72` — state.clear() в command_capital_edit
+- `289cede` — intercept slash commands inside FSM text handlers
+- `50841ff` — prepare_confirm edit_text crash on user messages
+- `9ae0f64` — account id in FSM state + model_validator + AccountSummary
+- `4795a89` — PATCH support in call_api
+
+### Результаты
+- ✅ `/capital_edit` показывает список счетов при каждом вызове
+- ✅ Confirm screen показывается корректно (answer вместо edit_text)
+- ✅ PATCH успешно сохраняет изменения (balance, currency, fx_rate, bucket)
+- ✅ D-37 зафиксирован в DECISION_LOG.md
+- ✅ PROJECT_SNAPSHOT.md обновлён
+
+### Следующий шаг
+- Phase 4, Task #4 или следующий приоритет по TASK.md

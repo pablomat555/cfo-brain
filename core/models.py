@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Dict, List, Any, Optional
 from sqlalchemy import Column, Integer, Date, String, DateTime, Numeric, UniqueConstraint, Float
 from sqlalchemy.ext.declarative import declarative_base
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 Base = declarative_base()
 

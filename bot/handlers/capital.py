@@ -372,6 +372,7 @@ async def process_confirm(callback_query, state: FSMContext):
 @router.message(Command("capital_edit"))
 async def command_capital_edit(message: Message, state: FSMContext):
     """Начать процесс редактирования существующего счёта"""
+    await state.clear()
     try:
         # Получаем список счетов
         response = await call_api("/capital/accounts")

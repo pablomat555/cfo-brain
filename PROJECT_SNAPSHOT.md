@@ -1,5 +1,5 @@
 # PROJECT SNAPSHOT: CFO Brain
-Последнее обновление: 16 апреля 2026, 23:00 (Kyiv)
+Последнее обновление: 18 апреля 2026, 19:40 (Kyiv)
 
 ## 1. Идентификация
 - **Цель:** Персональный финансовый директор в Telegram — трекинг бюджета, анализ расходов, симуляция финансовых сценариев
@@ -63,6 +63,9 @@
     - ✅ **Restore FX Rate Request in CSV Upload** — восстановлен запрос курса валют при загрузке CSV с UAH транзакций, добавлен эндпоинт `/ingest/csv/preview`, миграция 005
     - ✅ **Backup стратегия SQLite** — реализована система бэкапов БД cfo.db с автоматическим backup в Backblaze B2 и restore через CLI, добавлены скрипты `backup.py` и `restore.py`, сервис `cfo_backup` в docker-compose, переменные окружения в Doppler, протестировано в production (D-35)
   - Phase 4, Task #1 ✅ ЗАВЕРШЁН (i18n Loader — bot/i18n.py, locales/ru.json+en.json, smoke test PASS, D-36)
+  - Phase 4, Task #2 ✅ ЗАВЕРШЁН (i18n Migration: digest, observer, runway, verdict — все хендлеры мигрированы, smoke test PASS, D-36)
+  - Phase 4, Task #3 ✅ ЗАВЕРШЁН (/capital_edit Full Wizard — FSM с 4 полями, PATCH /capital/account/{id}, D-37)
+  - Phase 4, Task #4 ✅ ЗАВЕРШЁН (/position_edit Full Wizard — FSM с паттернами D-37, PATCH /capital/position/{id}, smoke test PASS, D-38)
 
 ### Что работает
 - ✅ Полная структура repo создана (20+ файлов)
@@ -109,6 +112,8 @@
 - ✅ **Verdict Engine:** Детерминированный движок принятия решений POST /verdict → Capital State + STRATEGY.md → APPROVED / APPROVED_WITH_IMPACT / DENIED. Включает три политики (Routine, Strategic, Exceptional), расчёт impact, интеграцию с ботом командой /verdict
 - ✅ **Runway Engine:** Burn Rate Calculator + Runway Simulation в analytics/runway_engine.py. Эндпоинты GET /runway и POST /runway/simulate, фильтрация по rate_type="manual", расчёт runway месяцев до emergency floor и нуля, self-sustaining статус при положительном cash flow. Интеграция с ботом командой /runway.
 - ✅ **CFO Rules блок в STRATEGY.md:** Machine-readable секция с параметрами стратегии для strategy_loader, парсинг через regex, fallback на defaults с warning
+- ✅ **/capital_edit Full Wizard:** FSM с выбором счёта, поля (balance, currency, fx_rate, bucket), PATCH /capital/account/{id}, state.clear() паттерн, prepare_confirm с явным флагом edit, D-37
+- ✅ **/position_edit Full Wizard:** FSM с выбором позиции, поля (account_name, asset_symbol, quantity, market_value, currency, fx_rate, as_of_date), PATCH /capital/position/{id}, паттерны D-37, защитная проверка API response (D-38)
 
 ### Known Issues
 - ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
@@ -116,7 +121,7 @@
 - ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop. Phase 3.
 - ⚠️ Rate type "skip" используется по умолчанию для исторических данных — аналитика с ним ограничена
 - ~~⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля~~ ✅ **ЗАКРЫТ D-37** — полный wizard (balance, currency, fx_rate, bucket) задеплоен и работает (17 апреля 2026)
-- ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)
+- ~~⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub)~~ ✅ **ЗАКРЫТ D-38** — полный wizard (6 полей) задеплоен и работает (18 апреля 2026)
 - ⚠️ `capital_classifier.py` использует хардкод маппинг — конфигурируемость планируется в Phase 4 (D-10 Verdict Engine)
 
 ### Recently Closed Issues
@@ -132,63 +137,46 @@
 - ✅ **WAR MODE — runway router не зарегистрирован** — `api/main.py` не содержал `runway` в import/include_router. Незакоммиченное изменение. Коммит `bae22dc`.
 - ✅ **WAR MODE — runway файлы не в репо** — `api/routers/runway.py` и `analytics/runway_engine.py` были untracked → ImportError на VPS. Коммит `011d114`. Правило добавлено в AGENT.md.
 - ✅ **WAR MODE D-37 — /capital_edit FSM полный фикс** — четыре связанных бага: `state.clear()` при старте, `prepare_confirm edit=True/False`, API `/capital/accounts` с id, `PATCH` в `call_api()`. Коммиты `ee11a72`, `289cede`, `50841ff`, `9ae0f64`, `4795a89`. D-37 зафиксирован.
+- ✅ **Phase 4, Task #4 — /position_edit Full Wizard** — реализация по паттернам D-37: модели PositionSummary и PositionUpdateRequest, эндпоинты GET /capital/positions и PATCH /capital/position/{id}, локали position_edit, FSM с 6 полями, smoke test PASS. Коммит `fc5472c`.
+- ✅ **WAR MODE D-38 — API Response Structure Bug** — `/position_edit` падал с "string indices must be integers, not 'str'". Root cause: API endpoint GET /capital/positions возвращает `{"positions": [...]}`, но бот ожидал raw list. Фикс: `positions = response.get("positions", [])` в `bot/handlers/capital.py`. Коммит `075aa0b`.
 
 ## 5. Фокус сессии
-- **Цель:** Phase 4, Task #3 — /capital_edit Full Wizard + WAR MODE фиксы FSM
-- **Last Commit:** `4795a89` fix(bot): add PATCH support to call_api
+- **Цель:** Phase 4, Task #5 — Конфигурируемый Capital Classifier (вынос хардкод маппинга)
+- **Last Commit:** `075aa0b` fix(bot): parse API response correctly in position_edit
 - **Git Status:** Все изменения закоммичены и запушены, контейнеры работают
-- **Состояние VPS:** `/capital_edit` wizard работает (balance, currency, fx_rate, bucket), PATCH успешен, все сервисы healthy
+- **Состояние VPS:** `/position_edit` wizard работает (FSM с 6 полями), PATCH успешен, все сервисы healthy
 
 ## Следующий шаг
-**Phase 3 АКТИВНА. Task #6 развёрнут и работает.**
+**Phase 4 АКТИВНА. Task #4 завершён, Task #5 в очереди.**
 
-**Выполненные действия:**
-1. ✅ **Restore FX Rate Request** — восстановлен запрос курса валют при загрузке CSV
-2. ✅ **Создан эндпоинт /ingest/csv/preview** для анализа CSV перед загрузкой
-3. ✅ **Добавлена миграция 005** — колонки fx_rate и rate_type в таблицу upload_sessions
-4. ✅ **Обновлён PROJECT_SNAPSHOT.md** — добавлена информация о выполненной задаче
+**Выполненные действия Phase 4:**
+1. ✅ **Task #1 — i18n Loader** — создан `bot/i18n.py`, локали `ru.json`/`en.json`, smoke test PASS
+2. ✅ **Task #2 — i18n Migration** — мигрированы все оставшиеся хендлеры (digest, observer, runway, verdict)
+3. ✅ **Task #3 — /capital_edit Full Wizard** — FSM с 4 полями, PATCH /capital/account/{id}, фиксы D-37
+4. ✅ **Task #4 — /position_edit Full Wizard** — FSM с 6 полями, PATCH /capital/position/{id}, фиксы D-38
 
-**Phase 3, Task #2 — Verdict Engine + Capital State (D-10)** (следующий этап):
-- Конфигурируемые правила классификации активов
-- Decision types: allocation, rebalance, risk alert
-- Интеграция с AI-анализом (OpenRouter)
+**Phase 4, Task #5 — Конфигурируемый Capital Classifier** (текущий приоритет):
+- Вынос хардкод маппинга из `core/capital_classifier.py` в конфигурационный файл
+- Поддержка динамического обновления через API
+- Интеграция с Verdict Engine
+- Smoke test на VPS
 
-**Phase 3, Task #3 — Runway / Burn Rate симуляция**
-- Прогноз cash flow на основе исторических данных
-- Визуализация runway в месяцах
+**Phase 4, Task #6 — Enhanced Observer Alerts** (планируется):
+- Уведомления о значительных отклонениях в реальном времени
+- Кастомизация порогов через STRATEGY.md
 
-**Phase 3, Task #4 — Backup стратегия SQLite**
-- Автоматический backup базы данных на S3/Backblaze
-- Восстановление через CLI
+**Статус Phase 4:**
+✅ Task #1 — i18n Loader
+✅ Task #2 — i18n Migration
+✅ Task #3 — /capital_edit Full Wizard
+✅ Task #4 — /position_edit Full Wizard
+🔶 Task #5 — Конфигурируемый Capital Classifier
+⬜ Task #6 — Enhanced Observer Alerts
 
-**Phase 3, Task #5 — Фикс D-25 (отрицательные суммы в baseline)**
-- ✅ **Выполнено:** Изменён `analytics/metrics_service.py` — применён `abs()` для расходных транзакций в агрегации категорий
-- ✅ **Выполнено:** Деплой изменений на VPS, пересборка контейнеров
-- ✅ **Выполнено:** Полный backfill 22 месяцев (2024-07 — 2026-04) с очисткой агрегатных таблиц
-- ✅ **Результат:** Аномалии детектируются (обнаружены 4 аномалии), baseline_avg теперь положительный, guard `baseline_avg <= 0` не блокирует детекцию
-- ✅ **Дополнительно:** Исправлен запуск бота (добавлен `api_port` в конфигурацию)
-
-**Phase 3, Task #6 — Restore FX Rate Request in CSV Upload**
-- ✅ **Выполнено:** Восстановлен запрос курса валют при загрузке CSV с UAH транзакциями
-- ✅ **Выполнено:** Создан эндпоинт GET `/ingest/csv/preview` для анализа CSV
-- ✅ **Выполнено:** Модифицирован POST `/ingest/csv` для приёма параметров `fx_rate` и `rate_type`
-- ✅ **Выполнено:** Добавлена миграция 005 для таблицы `upload_sessions`
-- ✅ **Выполнено:** Обновлён бот с FSM логикой запроса курса и опцией `/skip`
-- ✅ **Результат:** Бот спрашивает курс если в CSV есть UAH транзакции, `rate_type="manual"` сохраняется в `monthly_metrics`
-
-**Статус Phase 3:**
-✅ Task #1A — Capital Snapshot MVP
-✅ Task #1B — Portfolio Breakdown & Enhanced Capital State
-✅ Task #2 — Verdict Engine + Capital State (D-10)
-✅ Task #3 — Runway / Burn Rate симуляция
-✅ Task #4 — Backup стратегия SQLite
-✅ Task #5 — Фикс D-25 (отрицательные суммы в baseline)
-✅ Task #6 — Restore FX Rate Request in CSV Upload
-
-**Known Issues для Phase 3:**
-- ⚠️ "Balancing transaction" фильтр добавлен но старые данные очищены — нужна перезагрузка
-- ~~⚠️ `/capital_edit` wizard обновляет только баланс, не другие поля~~ ✅ **ЗАКРЫТ D-37** — полный wizard (balance, currency, fx_rate, bucket) задеплоен и работает (17 апреля 2026)
-- ⚠️ `/position_edit` требует доработки UI выбора позиции (оставлен stub
+**Known Issues для Phase 4:**
+- ⚠️ `capital_classifier.py` использует хардкод маппинг — будет решено в Task #5
+- ⚠️ Unclosed connector warning в боте (aiohttp cleanup) — некритично
+- ⚠️ APScheduler shutdown hook отсутствует — возможны warnings при docker stop
 
 ## Phase 4, Task #1 — i18n (Internationalization)
 

@@ -918,3 +918,31 @@ def validate_currency_fx_rate(self): ...
 
 ### Следующий шаг
 - Phase 4, Task #4 или следующий приоритет по TASK.md
+
+---
+
+## Сессия: Orchestrator — Обновление PROJECT_SNAPSHOT.md после Phase 4 Task #3
+**Дата:** 18 апреля 2026, 19:45 (Kyiv)
+**Участники:** Orchestrator
+**Статус:** ✅ ЗАВЕРШЕНО
+
+### Контекст
+Пользователь запросил обновление PROJECT_SNAPSHOT.md чтобы отразить текущее реальное состояние проекта после завершения Phase 4 Task #3 (/capital_edit Full Wizard).
+
+### Выполнено
+1. **Прочитаны HANDOFF.md, DECISION_LOG.md, DEV_LOG.md** — подтверждено завершение Task #3 (D-37)
+2. **Обновлён PROJECT_SNAPSHOT.md:**
+   - Дата обновления: 17 апреля 2026, 22:00 (Kyiv)
+   - Добавлен Phase 4, Task #3 как завершённый
+   - Добавлен пункт "Что работает": `/capital_edit Full Wizard` (FSM, 4 поля, PATCH)
+   - Обновлён "Фокус сессии": цель изменена на Phase 4, Task #4 — /position_edit
+   - Полностью переписан раздел "Следующий шаг" с актуальным статусом Phase 4
+3. **DEV_LOG.md дополнен** этой записью
+
+### Результаты
+- ✅ PROJECT_SNAPSHOT.md теперь отражает актуальное состояние (Phase 4 Task #3 закрыт, Task #4 в работе)
+- ✅ Все known issues обновлены (зачёркнутый пункт `/capital_edit` остаётся как исторический)
+- ✅ Следующая задача чётко определена: Phase 4 Task #4 — /position_edit Full Wizard
+
+### Следующий шаг
+- Создать/обновить TASK.md для Phase 4 Task #4 и передать Engineer

@@ -1209,6 +1209,35 @@ Phase 4, Task #3. Команда `/capital_edit` воспроизводила д
 
 ---
 
+## D-38 — API Response Structure Bug: Bot Expects List, API Returns Dict
+
+**Дата:** 18 апреля 2026 (Kyiv)
+**Статус:** ✅ ПРИНЯТО
+
+**Контекст:**
+Phase 4, Task #4. После реализации `/position_edit` Full Wizard, команда падала с ошибкой "string indices must be integers, not 'str'" при попытке показать список позиций. Smoke test на VPS показал, что бот получает ответ от API, но не может его распарсить.
+
+**Диагностика (root cause chain):**
+1. API endpoint `GET /capital/positions` возвращает JSON структуру `{"positions": [...]}` (стандартный формат для list-endpoints в CFO Brain API)
+2. Bot handler `command_position_edit` вызывал `call_api("/capital/positions")`, который возвращает `response.json()` — словарь `{"positions": [...]}`
+3. Код ожидал raw list: `positions = response` (строка 935 в `bot/handlers/capital.py`)
+4. Итерация `for position in positions:` пыталась индексировать строку ключом `"id"` → `TypeError: string indices must be integers, not 'str'`
+
+**Решение:**
+1. Изменить строку 935 в `bot/handlers/capital.py`:
+   ```python
+   positions = response.get("positions", [])
+   ```
+2. Добавить защитную проверку для всех list-endpoints в боте: всегда использовать `.get("key", [])` или `.get("key", {})` в зависимости от ожидаемой структуры API ответа.
+
+**Правила:**
+- Все API endpoints, возвращающие списки, должны использовать стандартный формат `{"items": [...]}` (уже принято в D-37)
+- Bot handlers должны явно извлекать ключ из response dict, не предполагая raw list
+- При разработке новых endpoints проверять соответствие формата ответа ожиданиям бота
+- Добавить правило в AGENT.md: "API-first architecture: все бизнес-логика в API, бот только собирает поля"
+
+---
+
 ## Zero-links
 ---
 - [[0 Projects]]

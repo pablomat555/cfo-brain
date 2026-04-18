@@ -50,6 +50,7 @@ async def main():
     dp.include_router(runway_router)
     
     # Запуск scheduler для еженедельного дайджеста
+    scheduler = None
     if settings.owner_chat_id:
         scheduler = setup_scheduler(bot, settings.owner_chat_id)
         scheduler.start()
@@ -65,6 +66,9 @@ async def main():
     except Exception as e:
         logger.error(f"Bot error: {e}")
     finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+            logger.info("Scheduler stopped")
         await bot.close()
 
 

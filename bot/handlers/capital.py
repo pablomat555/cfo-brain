@@ -932,7 +932,7 @@ async def command_position_edit(message: Message, state: FSMContext):
     try:
         # Получаем список позиций
         response = await call_api("/capital/positions")
-        positions = response  # response уже List[PositionSummary]
+        positions = response.get("positions", [])  # response — dict с ключом "positions"
 
         if not positions:
             await message.answer(t("position_edit.no_positions"))

@@ -1,72 +1,53 @@
 """
 Asset classification for capital snapshot.
-Rules are hardcoded per D-30/D-31 and TASK #1B.
+Rules loaded from config/classifier.yml (configurable).
 """
 
 from typing import Tuple
+from functools import lru_cache
+import yaml
+from pathlib import Path
+
+
+@lru_cache(maxsize=1)
+def _load_rules() -> dict:
+    """
+    Загружает правила классификации из config/classifier.yml.
+    
+    Результат кэшируется на весь lifecycle контейнера (lru_cache).
+    Изменения в YAML вступают в силу только после рестарта контейнера.
+    Это намеренное поведение — правила меняются только через git+deploy.
+    """
+    path = Path(__file__).parent.parent / "config" / "classifier.yml"
+    with open(path) as f:
+        return yaml.safe_load(f)
 
 
 def classify_asset(symbol: str) -> Tuple[str, str]:
     """
     Classify asset symbol into asset_type and liquidity_bucket.
 
-    Parameters
-    ----------
-    symbol : str
-        Asset symbol (case-insensitive, e.g., 'USDT', 'BTC', 'VOO').
-
-    Returns
-    -------
-    Tuple[str, str]
-        (asset_type, liquidity_bucket)
-
-    Rules (hardcoded):
-    - USDT / Trust Wallet USDT → stablecoin → liquid
-    - Crypto (BTC, ETH, LTC...) → crypto → semi_liquid
-    - SGOV → bond_etf → semi_liquid
-    - ETF (VOO, QQQ, VXUS) → etf → investment
-    - Steam → alternative → semi_liquid
-    - Loans → receivable → illiquid
-    - Cash USD/UAH → cash → liquid
+    Rules are loaded from config/classifier.yml.
+    Matching order: exact → prefix → fallback.
     """
+    rules = _load_rules()
     symbol_upper = symbol.strip().upper()
 
-    # Stablecoin
-    if symbol_upper in ("USDT", "USDT-TRUST"):
-        return "stablecoin", "liquid"
+    # exact match по всем категориям (кроме prefix_rules и fallback)
+    for category, rule in rules.items():
+        if category in ("prefix_rules", "fallback"):
+            continue
+        if symbol_upper in [s.upper() for s in rule.get("symbols", [])]:
+            return rule["asset_type"], rule["liquidity_bucket"]
 
-    # Crypto
-    crypto_symbols = {
-        "BTC", "ETH", "LTC", "XRP", "ADA", "DOT", "SOL", "BNB", "DOGE", "SHIB",
-        "MATIC", "AVAX", "ATOM", "LINK", "UNI", "AAVE", "ALGO", "XTZ", "XLM",
-        "VET", "TRX", "ETC", "BCH", "BSV", "EOS", "XMR", "ZEC", "DASH", "NEO",
-    }
-    if symbol_upper in crypto_symbols:
-        return "crypto", "semi_liquid"
+    # prefix match
+    for prefix_rule in rules.get("prefix_rules", []):
+        if symbol_upper.startswith(prefix_rule["prefix"].upper()):
+            return prefix_rule["asset_type"], prefix_rule["liquidity_bucket"]
 
-    # Bond ETF
-    if symbol_upper == "SGOV":
-        return "bond_etf", "semi_liquid"
-
-    # ETFs
-    etf_symbols = {"VOO", "QQQ", "VXUS", "VTI", "SPY", "IVV", "IWM", "EFA", "EEM"}
-    if symbol_upper in etf_symbols:
-        return "etf", "investment"
-
-    # Alternative (Steam)
-    if symbol_upper == "STEAM":
-        return "alternative", "semi_liquid"
-
-    # Loans (receivable)
-    if symbol_upper.startswith("LOAN"):
-        return "receivable", "illiquid"
-
-    # Cash
-    if symbol_upper in ("CASH", "USD", "UAH", "EUR", "GBP"):
-        return "cash", "liquid"
-
-    # Default fallback (treat as crypto-like)
-    return "crypto", "semi_liquid"
+    # fallback
+    fb = rules["fallback"]
+    return fb["asset_type"], fb["liquidity_bucket"]
 
 
 # Quick test if run directly

@@ -1,0 +1,88 @@
+# Asset Classification Rules
+# Порядок матчинга: exact → prefix → fallback
+
+stablecoin:
+  asset_type: stablecoin
+  liquidity_bucket: liquid
+  symbols:
+    - USDT
+    - USDT-TRUST
+
+crypto:
+  asset_type: crypto
+  liquidity_bucket: semi_liquid
+  symbols:
+    - BTC
+    - ETH
+    - LTC
+    - XRP
+    - ADA
+    - DOT
+    - SOL
+    - BNB
+    - DOGE
+    - SHIB
+    - MATIC
+    - AVAX
+    - ATOM
+    - LINK
+    - UNI
+    - AAVE
+    - ALGO
+    - XTZ
+    - XLM
+    - VET
+    - TRX
+    - ETC
+    - BCH
+    - BSV
+    - EOS
+    - XMR
+    - ZEC
+    - DASH
+    - NEO
+
+bond_etf:
+  asset_type: bond_etf
+  liquidity_bucket: semi_liquid
+  symbols:
+    - SGOV
+
+etf:
+  asset_type: etf
+  liquidity_bucket: investment
+  symbols:
+    - VOO
+    - QQQ
+    - VXUS
+    - VTI
+    - SPY
+    - IVV
+    - IWM
+    - EFA
+    - EEM
+
+alternative:
+  asset_type: alternative
+  liquidity_bucket: semi_liquid
+  symbols:
+    - STEAM
+
+cash:
+  asset_type: cash
+  liquidity_bucket: liquid
+  symbols:
+    - CASH
+    - USD
+    - UAH
+    - EUR
+    - GBP
+
+prefix_rules:
+  - prefix: LOAN
+    asset_type: receivable
+    liquidity_bucket: illiquid
+
+fallback:
+  asset_type: crypto
+  liquidity_bucket: semi_liquid

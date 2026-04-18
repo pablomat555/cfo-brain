@@ -69,7 +69,10 @@ async def main():
         if scheduler is not None:
             scheduler.shutdown(wait=False)
             logger.info("Scheduler stopped")
-        await bot.close()
+        try:
+            await bot.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ from core.models import (
     AccountBalance, PortfolioPosition, AccountBalanceCreate,
     AccountBalanceResponse, CapitalStateResponse, AccountListResponse,
     AccountSummary, CapitalSnapshotIngestResponse, PortfolioPositionCreate,
-    PortfolioPositionResponse, PortfolioPositionListResponse, AccountUpdateRequest
+    PortfolioPositionResponse, PortfolioPositionListResponse, AccountUpdateRequest,
+    PositionSummary, PositionUpdateRequest
 )
 from etl.capital_parser import parse_capital_snapshot_csv
 from core.capital_classifier import classify_asset
@@ -667,4 +668,109 @@ async def ingest_capital_snapshot(
         
     except Exception as e:
         logger.error(f"Error ingesting capital snapshot: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.get("/positions", response_model=List[PositionSummary])
+def get_latest_positions(db: Session = Depends(get_db)):
+    """
+    Получить список последних позиций портфеля (по максимальной дате для каждого asset_symbol)
+    """
+    try:
+        # Subquery для получения максимальной даты по каждому asset_symbol
+        latest_dates = db.query(
+            PortfolioPosition.asset_symbol,
+            func.max(PortfolioPosition.as_of_date).label("max_date")
+        ).group_by(PortfolioPosition.asset_symbol).subquery()
+
+        # Получаем позиции с максимальной датой
+        positions = db.query(PortfolioPosition).join(
+            latest_dates,
+            (PortfolioPosition.asset_symbol == latest_dates.c.asset_symbol) &
+            (PortfolioPosition.as_of_date == latest_dates.c.max_date)
+        ).order_by(PortfolioPosition.asset_symbol).all()
+
+        # Преобразуем в PositionSummary
+        result = []
+        for pos in positions:
+            result.append(
+                PositionSummary(
+                    id=pos.id,
+                    asset_symbol=pos.asset_symbol,
+                    asset_type=pos.asset_type,
+                    market_value=pos.market_value,
+                    quantity=pos.quantity,
+                    liquidity_bucket=pos.liquidity_bucket,
+                    as_of_date=pos.as_of_date.isoformat()
+                )
+            )
+        
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting latest positions: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.patch("/position/{position_id}", response_model=PortfolioPositionResponse)
+def update_portfolio_position(
+    position_id: int,
+    update_data: PositionUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Частичное обновление позиции портфеля по ID
+    """
+    try:
+        # Находим позицию
+        position = db.query(PortfolioPosition).filter(PortfolioPosition.id == position_id).first()
+        if not position:
+            raise HTTPException(status_code=404, detail="Position not found")
+
+        # Обновляем только non-None поля
+        if update_data.market_value is not None:
+            position.market_value = update_data.market_value
+        if update_data.quantity is not None:
+            position.quantity = update_data.quantity
+        if update_data.asset_type is not None:
+            position.asset_type = update_data.asset_type
+        if update_data.liquidity_bucket is not None:
+            position.liquidity_bucket = update_data.liquidity_bucket
+
+        # Если изменился asset_symbol, нужно переклассифицировать
+        # (но asset_symbol не входит в PositionUpdateRequest, поэтому пропускаем)
+
+        try:
+            db.commit()
+            db.refresh(position)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=409, detail=f"Conflict: {str(e)}")
+
+        # Вычисляем market_value_usd для ответа
+        if position.fx_rate != 0:
+            market_value_usd = position.market_value / position.fx_rate
+        else:
+            market_value_usd = 0.0
+
+        return PortfolioPositionResponse(
+            id=position.id,
+            account_name=position.account_name,
+            asset_symbol=position.asset_symbol,
+            asset_type=position.asset_type,
+            quantity=position.quantity,
+            market_value=position.market_value,
+            currency=position.currency,
+            fx_rate=position.fx_rate,
+            liquidity_bucket=position.liquidity_bucket,
+            as_of_date=position.as_of_date.isoformat(),
+            source=position.source,
+            created_at=position.created_at.isoformat(),
+            market_value_usd=market_value_usd
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating portfolio position: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")

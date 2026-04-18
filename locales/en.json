@@ -113,5 +113,18 @@
     "error": "❌ Error: {error}",
     "usage": "Usage: /verdict <amount> <category> [expense_type]\n\nExamples:\n  /verdict 500 dentistry exceptional\n  /verdict 1500 investments strategic\n  /verdict 200 groceries",
     "invalid_amount": "❌ Invalid amount. Enter a number."
+  },
+  "position_edit": {
+    "select_position": "Select position to edit:",
+    "select_field": "Editing position: {asset_symbol}\nSelect field to change:",
+    "input_market_value": "Enter new market value (number):",
+    "input_quantity": "Enter new quantity (number):",
+    "select_asset_type": "Select asset type:",
+    "select_bucket": "Select liquidity category:",
+    "confirm": "<b>Confirm update:</b>\n\n{diff}\n\nEverything correct?",
+    "saved": "✅ <b>Position successfully updated!</b>\n\n• {asset_symbol}\n\nUse /positions to see updated positions list.",
+    "cancelled": "❌ Editing cancelled.",
+    "not_found": "❌ Position not found.",
+    "no_positions": "📭 No portfolio positions. Add first via /position_add"
   }
 }

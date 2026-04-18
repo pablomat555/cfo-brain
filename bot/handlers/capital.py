@@ -48,12 +48,12 @@ class PositionAddStates(StatesGroup):
     confirm = State()
 
 
-# FSM States для /position_edit
+# FSM States для /position_edit (Rev 5 - Full Wizard)
 class PositionEditStates(StatesGroup):
-    select_position = State()
-    new_quantity = State()
-    new_market_value = State()
-    confirm = State()
+    SelectPosition = State()
+    SelectField = State()
+    InputValue = State()
+    Confirm = State()
 
 
 # Вспомогательные функции
@@ -924,11 +924,272 @@ async def process_position_confirm(callback_query, state: FSMContext):
     await callback_query.answer()
 
 
-# Команда /position_edit (упрощённая версия — требует доработки)
+# Команда /position_edit - начало FSM (Rev 5 - Full Wizard)
 @router.message(Command("position_edit"))
-async def command_position_edit(message: Message):
-    """Редактирование позиции (заглушка)"""
-    await message.answer(
-        "Редактирование позиций пока не реализовано. "
-        "Используйте /positions чтобы увидеть список, затем удалите и добавьте заново."
+async def command_position_edit(message: Message, state: FSMContext):
+    """Начать процесс редактирования существующей позиции портфеля"""
+    await state.clear()  # Паттерн D-37: сброс состояния в начале
+    try:
+        # Получаем список позиций
+        response = await call_api("/capital/positions")
+        positions = response  # response уже List[PositionSummary]
+
+        if not positions:
+            await message.answer(t("position_edit.no_positions"))
+            return
+
+        # Сохраняем позиции в state для быстрого lookup по ID
+        await state.update_data(positions={str(p["id"]): p for p in positions})
+
+        # Создаём клавиатуру с позициями
+        keyboard = InlineKeyboardBuilder()
+        for pos in positions:
+            display = f"{pos['asset_symbol']} ({pos['asset_type']}) - ${pos['market_value']:,.2f}"
+            keyboard.button(text=display, callback_data=f"edit_position_{pos['id']}")
+        keyboard.adjust(1)
+
+        await message.answer(
+            t("position_edit.select_position"),
+            reply_markup=keyboard.as_markup()
+        )
+        await state.set_state(PositionEditStates.SelectPosition)
+
+    except Exception as e:
+        logger.error(f"Error in /position_edit command: {e}")
+        await message.answer(t("position_edit.not_found"))
+
+
+# Шаг 1: SelectPosition (обработка callback)
+@router.callback_query(PositionEditStates.SelectPosition, F.data.startswith("edit_position_"))
+async def process_select_position(callback_query, state: FSMContext):
+    position_id = callback_query.data.replace("edit_position_", "")
+    data = await state.get_data()
+    position = data.get("positions", {}).get(position_id)
+    if not position:
+        await callback_query.message.edit_text(t("position_edit.not_found"))
+        await state.clear()
+        await callback_query.answer()
+        return
+    await state.update_data(current_position=position)
+
+    # Клавиатура выбора поля
+    keyboard = InlineKeyboardBuilder()
+    fields = [
+        ("💰 Рыночная стоимость", "market_value"),
+        ("📊 Количество", "quantity"),
+        ("📈 Тип актива", "asset_type"),
+        ("📦 Категория ликвидности", "liquidity_bucket")
+    ]
+    for display, field in fields:
+        keyboard.button(text=display, callback_data=f"edit_field_{field}")
+    keyboard.adjust(2)
+
+    await callback_query.message.edit_text(
+        t("position_edit.select_field", asset_symbol=position["asset_symbol"]),
+        reply_markup=keyboard.as_markup()
     )
+    await state.set_state(PositionEditStates.SelectField)
+    await callback_query.answer()
+
+
+# Шаг 2: SelectField (обработка callback)
+@router.callback_query(PositionEditStates.SelectField, F.data.startswith("edit_field_"))
+async def process_select_field(callback_query, state: FSMContext):
+    field = callback_query.data.replace("edit_field_", "")
+    await state.update_data(selected_field=field)
+
+    data = await state.get_data()
+    current_position = data.get("current_position", {})
+
+    if field in ("asset_type", "liquidity_bucket"):
+        # Для enum полей показываем inline keyboard
+        if field == "asset_type":
+            # Получаем возможные значения из классификатора
+            from core.capital_classifier import classify_asset
+            # Создаём список уникальных типов из классификатора
+            asset_types = ["stablecoin", "crypto", "bond_etf", "etf", "alternative", "receivable", "cash"]
+            keyboard = InlineKeyboardBuilder()
+            for asset_type in asset_types:
+                keyboard.button(text=asset_type, callback_data=f"edit_value_{asset_type}")
+            keyboard.adjust(2)
+            prompt = t("position_edit.select_asset_type")
+        else:  # liquidity_bucket
+            keyboard = InlineKeyboardBuilder()
+            buckets = [
+                ("💧 Liquid", "liquid"),
+                ("🔄 Semi-liquid", "semi_liquid"),
+                ("📈 Investment", "investment"),
+                ("🔒 Illiquid", "illiquid")
+            ]
+            for display, bucket_val in buckets:
+                keyboard.button(text=display, callback_data=f"edit_value_{bucket_val}")
+            keyboard.adjust(1)
+            prompt = t("position_edit.select_bucket")
+
+        await callback_query.message.edit_text(
+            prompt,
+            reply_markup=keyboard.as_markup()
+        )
+        await state.set_state(PositionEditStates.InputValue)
+    else:
+        # Для market_value и quantity запрашиваем текстовый ввод
+        prompt = t(f"position_edit.input_{field}")
+        await callback_query.message.edit_text(prompt)
+        await state.set_state(PositionEditStates.InputValue)
+
+    await callback_query.answer()
+
+
+# Шаг 3: InputValue (обработка callback для enum полей)
+@router.callback_query(PositionEditStates.InputValue, F.data.startswith("edit_value_"))
+async def process_input_value_callback(callback_query, state: FSMContext):
+    value = callback_query.data.replace("edit_value_", "")
+    data = await state.get_data()
+    field = data.get("selected_field")
+
+    if field == "asset_type":
+        await state.update_data(new_asset_type=value)
+    elif field == "liquidity_bucket":
+        await state.update_data(new_liquidity_bucket=value)
+    else:
+        # Не должно случиться
+        pass
+
+    await prepare_confirm_position(callback_query.message, state, edit=True)
+    await callback_query.answer()
+
+
+# Шаг 3: InputValue (текстовый ввод для market_value и quantity)
+@router.message(PositionEditStates.InputValue)
+async def process_input_value_text(message: Message, state: FSMContext):
+    if message.text and message.text.startswith("/"):
+        await state.clear()
+        await command_position_edit(message, state)
+        return
+    data = await state.get_data()
+    field = data.get("selected_field")
+
+    try:
+        if field == "market_value":
+            value = float(message.text.replace(",", "."))
+            if value <= 0:
+                await message.answer(t("capital.position_add_market_value_positive"))
+                return
+            await state.update_data(new_market_value=value)
+        elif field == "quantity":
+            value = float(message.text.replace(",", "."))
+            if value <= 0:
+                await message.answer(t("capital.position_add_quantity_positive"))
+                return
+            await state.update_data(new_quantity=value)
+        else:
+            await message.answer(t("position_edit.not_found"))
+            return
+    except ValueError:
+        await message.answer(t("capital.position_add_market_value_invalid"))
+        return
+
+    await prepare_confirm_position(message, state)
+
+
+async def prepare_confirm_position(message_or_callback, state: FSMContext, edit: bool = False):
+    """Подготовка подтверждения с diff для позиции"""
+    data = await state.get_data()
+    current_position = data.get("current_position", {})
+    field = data.get("selected_field")
+
+    # Собираем diff
+    diff_lines = []
+    if field == "market_value":
+        old = current_position.get("market_value", 0)
+        new = data.get("new_market_value")
+        diff_lines.append(f"💰 Рыночная стоимость: ${old:,.2f} → ${new:,.2f}")
+    elif field == "quantity":
+        old = current_position.get("quantity", 0)
+        new = data.get("new_quantity")
+        diff_lines.append(f"📊 Количество: {old} → {new}")
+    elif field == "asset_type":
+        old = current_position.get("asset_type", "crypto")
+        new = data.get("new_asset_type")
+        diff_lines.append(f"📈 Тип актива: {old} → {new}")
+    elif field == "liquidity_bucket":
+        old = current_position.get("liquidity_bucket", "semi_liquid")
+        new = data.get("new_liquidity_bucket")
+        bucket_names = {
+            "liquid": "💧 Liquid",
+            "semi_liquid": "🔄 Semi-liquid",
+            "investment": "📈 Investment",
+            "illiquid": "🔒 Illiquid"
+        }
+        old_display = bucket_names.get(old, old)
+        new_display = bucket_names.get(new, new)
+        diff_lines.append(f"📦 Категория ликвидности: {old_display} → {new_display}")
+
+    diff_text = "\n".join(diff_lines)
+
+    confirm_text = t("position_edit.confirm", diff=diff_text)
+
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text="✅ Сохранить", callback_data="position_confirm_save")
+    keyboard.button(text="❌ Отмена", callback_data="position_confirm_cancel")
+    keyboard.adjust(2)
+
+    if edit:
+        await message_or_callback.edit_text(confirm_text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+    else:
+        await message_or_callback.answer(confirm_text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+
+    await state.set_state(PositionEditStates.Confirm)
+
+
+# Шаг 4: Confirm (обработка callback)
+@router.callback_query(PositionEditStates.Confirm, F.data.in_(["position_confirm_save", "position_confirm_cancel"]))
+async def process_position_confirm(callback_query, state: FSMContext):
+    if callback_query.data == "position_confirm_cancel":
+        await callback_query.message.edit_text(t("position_edit.cancelled"))
+        await state.clear()
+        await callback_query.answer()
+        return
+
+    data = await state.get_data()
+    position_id = data.get("current_position", {}).get("id")
+    if not position_id:
+        await callback_query.message.edit_text(t("position_edit.not_found"))
+        await state.clear()
+        await callback_query.answer()
+        return
+
+    # Формируем payload для PATCH
+    payload = {}
+    field = data.get("selected_field")
+    if field == "market_value":
+        payload["market_value"] = data.get("new_market_value")
+    elif field == "quantity":
+        payload["quantity"] = data.get("new_quantity")
+    elif field == "asset_type":
+        payload["asset_type"] = data.get("new_asset_type")
+    elif field == "liquidity_bucket":
+        payload["liquidity_bucket"] = data.get("new_liquidity_bucket")
+
+    try:
+        # Вызываем PATCH API
+        response = await call_api(f"/capital/position/{position_id}", method="PATCH", json_data=payload)
+
+        # Успех
+        success_text = t("position_edit.saved", asset_symbol=data.get("current_position", {}).get("asset_symbol", ""))
+        await callback_query.message.edit_text(success_text, parse_mode="HTML")
+
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 409:
+            await callback_query.message.edit_text(t("capital.edit.conflict"))
+        elif e.response.status_code == 404:
+            await callback_query.message.edit_text(t("position_edit.not_found"))
+        else:
+            logger.error(f"API error {e.response.status_code}: {e.response.text}")
+            await callback_query.message.edit_text(t("position_edit.not_found"))
+    except Exception as e:
+        logger.error(f"Error updating position via API: {e}")
+        await callback_query.message.edit_text(t("position_edit.not_found"))
+
+    await state.clear()
+    await callback_query.answer()

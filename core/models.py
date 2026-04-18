@@ -367,3 +367,35 @@ class CapitalSnapshotIngestResponse(BaseModel):
     snapshot_type: str  # account | portfolio
     as_of_date: str
     accounts: List[str]
+
+
+class PositionSummary(BaseModel):
+    """Краткая информация о позиции портфеля для списка"""
+    id: int
+    asset_symbol: str
+    asset_type: str
+    market_value: float
+    quantity: float
+    liquidity_bucket: str
+    as_of_date: str
+
+    class Config:
+        from_attributes = True
+
+
+class PositionUpdateRequest(BaseModel):
+    """Pydantic модель для частичного обновления позиции портфеля"""
+    market_value: float | None = None
+    quantity: float | None = None
+    asset_type: str | None = None
+    liquidity_bucket: str | None = None
+
+    @model_validator(mode="after")
+    def validate_not_empty(self):
+        """Проверка что хотя бы одно поле передано"""
+        if all(
+            field is None
+            for field in [self.market_value, self.quantity, self.asset_type, self.liquidity_bucket]
+        ):
+            raise ValueError("At least one field must be provided for update")
+        return self
